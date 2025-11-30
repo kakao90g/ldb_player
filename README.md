@@ -16,7 +16,7 @@ LDB Player is a Windows-specific media player that transforms your desktop backg
 - Python 3.10+ (required only for running from source).
 
 ## Downloads (For End Users)
-- For a ready-to-use version without needing Python or dependencies, download the latest standalone executable (.exe) from the Releases page. Simply run the .exe to start the player—no installation required.
+- For a ready-to-use version without needing Python or dependencies, download the latest standalone executable (.exe) from the [Releases page](https://github.com/kakao90g/ldb_player/releases). Simply run the .exe to start the player—no installation required.
 
 ## Installation from Source (For Developers)
 1. Clone or download this repository.
