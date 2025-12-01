@@ -1932,6 +1932,7 @@ class LDBPlayer(QMainWindow):
             video_name = os.path.basename(self.playlist[self.current_video_index])
             self.current_video_label.setText(self.truncate_label_text(video_name))
             QTimer.singleShot(100, self.ensure_playing_and_set_audio)
+        self.save_config()
         self.update_tray_actions()
         self.update_control_dialog()
         self.update_fullscreen_button_state()
@@ -2297,6 +2298,7 @@ class LDBPlayer(QMainWindow):
                 video_name = os.path.basename(self.playlist[self.current_video_index])
                 self.current_video_label.setText(self.truncate_label_text(video_name))
                 QTimer.singleShot(100, self.ensure_playing_and_set_audio)
+        self.save_config()
         self.update_control_dialog()
         self.update_fullscreen_button_state()
         self.update_tray_actions()
@@ -2322,6 +2324,7 @@ class LDBPlayer(QMainWindow):
             self.set_wallpaper(self.original_wallpaper)
         if self.fullscreen_enabled and self.is_fullscreen:
             self.toggle_fullscreen()
+        self.save_config()
         self.update_control_dialog()
         self.update_fullscreen_button_state()
         self.update_tray_actions()
@@ -2513,7 +2516,6 @@ class LDBPlayer(QMainWindow):
         if self.original_wallpaper:
             self.set_wallpaper(self.original_wallpaper)
         self.stop()
-        self.save_config()
         QApplication.quit()
 
 if __name__ == '__main__':
