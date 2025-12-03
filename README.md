@@ -57,7 +57,7 @@ Support the project:
 - PayPal: https://paypal.me/kakao90g
 
 Join the community:
-- Discord: https://discord.gg/EBqnchP9
+- Discord: https://discord.gg/TAfUNGHYR3
 
 ## Version Changes
 - v1.0.0
