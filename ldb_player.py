@@ -6,6 +6,8 @@ import win32gui
 import win32con
 import winreg
 import win32api
+import requests
+import subprocess
 from win32api import GetSystemMetrics
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
@@ -30,7 +32,7 @@ def resource_path(relative_path):
 
 logging.basicConfig(level=logging.CRITICAL)
 
-VERSION = "0.9.8"
+VERSION = "1.0.0"
 
 QSS_STYLE = """
 QMainWindow, QDialog {
@@ -58,7 +60,7 @@ QPushButton#settingsButton, QPushButton#aboutButton {
 QPushButton#okButton, QPushButton#cancelButton, QPushButton#addButton, QPushButton#removeButton,
 QPushButton#moveUpButton, QPushButton#moveDownButton, QPushButton#shuffleButton, QPushButton#clearButton,
 QPushButton#saveButton, QPushButton#loadButton, QPushButton#manageButton, QPushButton#renameButton,
-QPushButton#deleteButton, QPushButton#playSelectedButton, QPushButton#hotkeysButton {
+QPushButton#deleteButton, QPushButton#playSelectedButton, QPushButton#hotkeysButton, QPushButton#checkUpdatesButton {
     width: 80px;
     height: 32px;
     border-radius: 16px;
@@ -246,6 +248,28 @@ class MessageDialog(DialogBase):
         ok_button.clicked.connect(self.accept)
         self.content_layout.addWidget(ok_button)
 
+class LinkMessageDialog(DialogBase):
+    def __init__(self, parent, title, message, link=None):
+        super().__init__(parent, title)
+        message_label = QLabel(message)
+        message_label.setWordWrap(True)
+        message_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.content_layout.addWidget(message_label)
+        if link:
+            link_label = QLabel(f'<a href="{link}" style="color: #4A90E2; text-decoration: none;">{link}</a>')
+            link_label.setTextFormat(Qt.TextFormat.RichText)
+            link_label.setOpenExternalLinks(True)
+            link_label.setWordWrap(True)
+            link_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.content_layout.addWidget(link_label)
+        ok_button = QPushButton("OK")
+        ok_button.setObjectName("okButton")
+        ok_button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        ok_button.setDefault(True)
+        ok_button.setAutoDefault(True)
+        ok_button.clicked.connect(self.accept)
+        self.content_layout.addWidget(ok_button)
+
 class ConfirmDialog(DialogBase):
     def __init__(self, parent, title, message):
         super().__init__(parent, title)
@@ -409,6 +433,12 @@ class SettingsDialog(DialogBase):
         self.hotkeys_button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.hotkeys_button.clicked.connect(self.open_hotkeys)
         self.content_layout.addWidget(self.hotkeys_button)
+        self.check_updates_button = QPushButton("Check for Updates")
+        self.check_updates_button.setObjectName("checkUpdatesButton")
+        self.check_updates_button.setToolTip("Check for Updates (U)")
+        self.check_updates_button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.check_updates_button.clicked.connect(self.parent.check_for_updates)
+        self.content_layout.addWidget(self.check_updates_button)
         button_layout = QHBoxLayout()
         button_layout.setSpacing(10)
         ok_button = QPushButton("OK")
@@ -434,6 +464,8 @@ class SettingsDialog(DialogBase):
             self.autostart_cb.setChecked(not self.autostart_cb.isChecked())
         elif event.key() == Qt.Key.Key_H:
             self.open_hotkeys()
+        elif event.key() == Qt.Key.Key_U:
+            self.parent.check_for_updates()
         super().keyPressEvent(event)
 
     def handle_ok(self):
@@ -1456,6 +1488,7 @@ class LDBPlayer(QMainWindow):
         self.central_frame.installEventFilter(self)
         self.init_system_tray()
         self.load_config()
+        self.session = requests.Session()
         self.update_tray_actions()
         if self.current_wallpaper == "" and self.playback_state in ['playing', 'paused']:
             self.original_wallpaper = self.saved_original_wallpaper
@@ -2228,6 +2261,69 @@ class LDBPlayer(QMainWindow):
             dialog = MessageDialog(self, "Error", f"Failed to open Settings dialog: {str(e)}")
             dialog.exec()
 
+    def check_for_updates(self):
+        url = "https://api.github.com/repos/kakao90g/ldb_player/releases/latest"
+        try:
+            response = self.session.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+            latest_version = data['tag_name'].lstrip('v')
+            current_version = VERSION
+            if latest_version == current_version:
+                dialog = MessageDialog(self, "Update Check", "Version is up to date.")
+                dialog.exec()
+            elif tuple(map(int, latest_version.split("."))) > tuple(map(int, current_version.split("."))):
+                self.show_update_dialog(latest_version)
+            else:
+                dialog = MessageDialog(self, "Update Check", "Version is up to date.")
+                dialog.exec()
+        except Exception as e:
+            logging.error(f"Failed to check for updates: {str(e)}")
+            dialog = MessageDialog(self, "Update Check", "Unable to check for updates.")
+            dialog.exec()
+
+    def show_update_dialog(self, new_version):
+        current_exe = sys.executable if getattr(sys, "frozen", False) else None
+        if not current_exe:
+            dialog = LinkMessageDialog(self, "Update Check", "Please download the latest release from:", link="https://github.com/kakao90g/ldb_player/releases")
+            dialog.exec()
+            return
+        updater_path = os.path.join(os.path.dirname(current_exe), "updater.exe")
+        github_link = "https://github.com/kakao90g/ldb_player/releases"
+        def run_updater():
+            subprocess.Popen([updater_path, new_version])
+            self.quit_application()
+        def on_no():
+            dialog = LinkMessageDialog(self, "Update", "Please download from:", link=github_link)
+            dialog.exec()
+        if os.path.exists(updater_path):
+            dialog = ConfirmDialog(self, "Update Available", f"New version v{new_version} is available.\nDo you want to run the updater now?")
+            if dialog.exec() == QDialog.DialogCode.Accepted:
+                run_updater()
+            else:
+                on_no()
+        else:
+            def download_and_run():
+                try:
+                    updater_url = f"https://github.com/kakao90g/ldb_player/releases/latest/download/updater.exe"
+                    response = self.session.get(updater_url, headers={"User-Agent": "Mozilla/5.0"}, timeout=30, stream=True)
+                    response.raise_for_status()
+                    with open(updater_path, "wb") as f:
+                        f.write(response.content)
+                    if os.path.getsize(updater_path) > 0:
+                        run_updater()
+                    else:
+                        raise ValueError("Updater download is empty")
+                except Exception as e:
+                    logging.error(f"Failed to download updater: {str(e)}")
+                    dialog = LinkMessageDialog(self, "Update Error", "Failed to download updater. Please get it from:", link=github_link)
+                    dialog.exec()
+            dialog = ConfirmDialog(self, "Update Available", f"New version v{new_version} is available.\nDo you want to download and run the updater now?")
+            if dialog.exec() == QDialog.DialogCode.Accepted:
+                download_and_run()
+            else:
+                on_no()
+
     def open_about(self):
         try:
             dialog = AboutDialog(self)
@@ -2493,7 +2589,8 @@ class LDBPlayer(QMainWindow):
             self.update_fullscreen_button_state()
 
     def handle_stop_event(self, event):
-        self.video_window.hide()
+        if hasattr(self, 'video_window') and self.video_window and not sip.isdeleted(self.video_window):
+            self.video_window.hide()
         self.current_video_label.setText(self.truncate_label_text("No video playing" if self.playlist else "Playlist is empty"))
         self.duration_label.setText("--:-- / --:--")
         if self.original_bg_color:
