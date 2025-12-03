@@ -513,7 +513,7 @@ class AboutDialog(DialogBase):
         self.content_layout.addWidget(support_label)
         community_label = QLabel(
             'Join the community:<br>'
-            '- Discord: <a href="https://discord.gg/EBqnchP9" style="color: #4A90E2; text-decoration: none;">https://discord.gg/EBqnchP9</a>'
+            '- Discord: <a href="https://discord.gg/TAfUNGHYR3" style="color: #4A90E2; text-decoration: none;">https://discord.gg/TAfUNGHYR3</a>'
         )
         community_label.setTextFormat(Qt.TextFormat.RichText)
         community_label.setObjectName("communityLabel")
