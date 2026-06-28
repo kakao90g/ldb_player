@@ -1,15 +1,16 @@
 # LDB Player (Live Desktop Background Player)
 
-LDB Player is a Windows-specific media player that transforms your desktop background into a live video player. It supports playlists, global hotkeys, drag-and-drop functionality, and seamless desktop integration.
+LDB Player is a Windows-specific media player that transforms your desktop into a live video player. It supports playlists, global hotkeys, drag-and-drop, multi-monitor displays, and seamless desktop integration.
 
 ## Features
 - Play videos as live desktop backgrounds.
-- Playlist management: Add, remove, shuffle, save, and load playlists.
-- Global hotkeys for playback control, volume adjustment, and navigation.
+- **Multi-display support** — choose which monitor to use in Settings.
+- Playlist management: Add, remove, shuffle, save, and load playlists (with drag-and-drop support).
+- Global hotkeys for playback control, volume adjustment, seeking, and navigation.
 - Repeat modes (single video or entire playlist).
 - Autostart settings and hotkey reference.
-- Dark-themed user interface.
-- Update checker in Settings with automatic updater support.
+- Dark-themed, modern user interface.
+- Built-in update checker with automatic updater support.
 
 ## Requirements
 - Windows 11.
@@ -54,12 +55,18 @@ The updater is a separate script (updater.py) that handles downloading and repla
 - Other dependencies: Python standard libraries (sys, os, json, etc.), vlc.py bindings.
 
 Support the project:
+- GitHub Sponsors: https://github.com/sponsors/kakao90g
 - PayPal: https://paypal.me/kakao90g
 
 Join the community:
 - Discord: https://discord.gg/TAfUNGHYR3
 
 ## Version Changes
+- v1.0.2
+    - Multi-display support
+    - Improved autostart stability
+    - Removed desktop wallpaper tampering (cleaner operation)
+    - Various improvements and bug fixes
 - v1.0.0
     - Minimal bug fixes
     - Updater function

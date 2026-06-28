@@ -5,19 +5,17 @@ import vlc
 import win32gui
 import win32con
 import winreg
-import win32api
 import requests
 import subprocess
-from win32api import GetSystemMetrics
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QSlider, QSystemTrayIcon, QMenu, QFileDialog,
-    QDialog, QCheckBox, QLabel, QListWidget, QFrame, QLineEdit, QTableWidget, QTableWidgetItem
+    QDialog, QCheckBox, QLabel, QListWidget, QFrame, QLineEdit, QTableWidget, QTableWidgetItem,
+    QComboBox
 )
 from PyQt6.QtCore import Qt, QTimer, QEvent, QPoint, QSize, QRectF
 from PyQt6.QtGui import QIcon, QAction, QPainter, QPainterPath, QColor
 import pathlib
-import ctypes
 import random
 import urllib.parse
 import logging
@@ -32,7 +30,7 @@ def resource_path(relative_path):
 
 logging.basicConfig(level=logging.CRITICAL)
 
-VERSION = "1.0.0"
+VERSION = "1.0.2"
 
 QSS_STYLE = """
 QMainWindow, QDialog {
@@ -396,9 +394,9 @@ class HotkeysDialog(DialogBase):
             ("Playlist Hotkeys", ""),
             ("Ctrl+N", "Add"),
             ("Del", "Remove"),
-            ("Ctrl+U", "Move up"),
-            ("Ctrl+D", "Move down"),
-            ("Ctrl+P", "Play selected"),
+            ("Ctrl+U", "Move Up"),
+            ("Ctrl+D", "Move Down"),
+            ("Ctrl+P", "Play Selected"),
             ("Ctrl+R", "Shuffle"),
             ("Ctrl+E", "Clear"),
             ("Ctrl+S", "Save"),
@@ -410,8 +408,10 @@ class HotkeysDialog(DialogBase):
             ("Del", "Delete"),
             ("", ""),
             ("Settings Hotkeys", ""),
-            ("A", "Toggle autostart"),
-            ("H", "Hotkeys")
+            ("D", "Select Display"),
+            ("A", "Toggle Autostart"),
+            ("H", "Hotkeys"),
+            ("U", "Check for Updates")
         ]
         self.hotkeys_table.setRowCount(len(hotkeys))
         for row, (hotkey, function) in enumerate(hotkeys):
@@ -422,7 +422,16 @@ class HotkeysDialog(DialogBase):
 class SettingsDialog(DialogBase):
     def __init__(self, parent):
         super().__init__(parent, "Settings")
+        self.setModal(True)
         self.parent = parent
+        monitor_label = QLabel("Select Display:")
+        self.monitor_combo = QComboBox()
+        self.monitor_combo.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.monitor_combo.addItems(parent.get_available_monitors())
+        self.monitor_combo.setCurrentIndex(parent.get_valid_monitor_index())
+        self.monitor_combo.setCurrentIndex(parent.selected_monitor_index)
+        self.content_layout.addWidget(monitor_label)
+        self.content_layout.addWidget(self.monitor_combo)
         self.autostart_cb = QCheckBox("Autostart on system startup (A)")
         self.autostart_cb.setChecked(parent.is_autostart_enabled())
         self.autostart_cb.setFocusPolicy(Qt.FocusPolicy.NoFocus)
@@ -457,16 +466,25 @@ class SettingsDialog(DialogBase):
 
     def keyPressEvent(self, event):
         if event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
-            self.handle_ok()
+            if self.monitor_combo.showPopup():
+                self.monitor_combo.hidePopup()
+                self.monitor_combo.clearFocus()
+                self.setFocus()
+                return
+            else:
+                self.handle_ok()
         elif event.key() == Qt.Key.Key_Escape:
             self.reject()
         elif event.key() == Qt.Key.Key_A:
             self.autostart_cb.setChecked(not self.autostart_cb.isChecked())
+        elif event.key() == Qt.Key.Key_D:
+            self.monitor_combo.showPopup()
         elif event.key() == Qt.Key.Key_H:
             self.open_hotkeys()
         elif event.key() == Qt.Key.Key_U:
             self.parent.check_for_updates()
-        super().keyPressEvent(event)
+        else:
+            super().keyPressEvent(event)
 
     def handle_ok(self):
         autostart_enabled = self.autostart_cb.isChecked()
@@ -474,6 +492,8 @@ class SettingsDialog(DialogBase):
 
         if autostart_changed:
             self.parent.toggle_autostart(autostart_enabled)
+
+        self.parent.selected_monitor_index = self.monitor_combo.currentIndex()
 
         self.accept()
 
@@ -484,6 +504,8 @@ class SettingsDialog(DialogBase):
 class AboutDialog(DialogBase):
     def __init__(self, parent):
         super().__init__(parent, "About")
+        self.setModal(True)
+        self.parent = parent
         info_label = QLabel(f"LDB Player\nVersion {VERSION}\nLicense: MIT\nDeveloped by @kakao90g")
         info_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.content_layout.addWidget(info_label)
@@ -502,7 +524,7 @@ class AboutDialog(DialogBase):
         self.content_layout.addWidget(credits_label)
         support_label = QLabel(
             'Support the project:<br>'
-            '- GitHub: <a href="https://github.com/kakao90g" style="color: #4A90E2; text-decoration: none;">https://github.com/kakao90g</a><br>'
+            '- GitHub: <a href="https://github.com/sponsors/kakao90g" style="color: #4A90E2; text-decoration: none;">https://github.com/sponsors/kakao90g</a><br>'
             '- PayPal: <a href="https://paypal.me/kakao90g" style="color: #4A90E2; text-decoration: none;">https://paypal.me/kakao90g</a>'
         )
         support_label.setTextFormat(Qt.TextFormat.RichText)
@@ -1363,12 +1385,13 @@ class VideoWindow(QWidget):
         self.setGeometry(QApplication.primaryScreen().geometry())
         self.showFullScreen()
 
-    def enter_desktop(self):
-        self.parent.set_wallpaper("")
-        self.parent.set_bg_color("0 0 0")
+    def enter_desktop(self, screen=None):
+        if screen is None:
+            screen = QApplication.primaryScreen()
         self.hide()
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint)
-        self.setGeometry(0, 0, GetSystemMetrics(0), GetSystemMetrics(1))
+        geom = screen.geometry()
+        self.setGeometry(geom)
         self.setAttribute(Qt.WidgetAttribute.WA_NativeWindow)
 
         progman = win32gui.FindWindow("Progman", None)
@@ -1376,9 +1399,9 @@ class VideoWindow(QWidget):
         def_view = win32gui.FindWindowEx(progman, 0, "SHELLDLL_DefView", None)
         video_hwnd = int(self.winId())
         win32gui.SetParent(video_hwnd, progman)
-        screen_width = GetSystemMetrics(0)
-        screen_height = GetSystemMetrics(1)
-        win32gui.SetWindowPos(video_hwnd, win32con.HWND_TOP, 0, 0, screen_width, screen_height, win32con.SWP_SHOWWINDOW | win32con.SWP_NOACTIVATE)
+        win32gui.SetWindowPos(video_hwnd, win32con.HWND_TOP, 
+                             geom.x(), geom.y(), geom.width(), geom.height(), 
+                             win32con.SWP_SHOWWINDOW | win32con.SWP_NOACTIVATE)
 
     def start_hide_timer(self):
         self.initial_show = False
@@ -1449,8 +1472,6 @@ class LDBPlayer(QMainWindow):
         self.setWindowIcon(QIcon(resource_path("icons/tray_icon.png")))
         self.setWindowTitle("LDB Player")
         self.setWindowOpacity(0.9)
-        self.original_wallpaper = self.get_current_wallpaper()
-        self.original_bg_color = self.get_current_bg_color()
         self.repeat_mode = 'one'
         self.is_muted = False
         self.original_playlist = []
@@ -1466,6 +1487,7 @@ class LDBPlayer(QMainWindow):
         self.is_paused = False
         self.is_fullscreen = False
         self.fullscreen_enabled = False
+        self.selected_monitor_index = 0
         self.config_dir = os.path.join(pathlib.Path.home(), 'AppData', 'Local', 'LDBPlayer')
         self.config_file = os.path.join(self.config_dir, 'ldb_player_config.json')
         self.volume_debounce_timer = QTimer(self)
@@ -1477,8 +1499,6 @@ class LDBPlayer(QMainWindow):
         self.dragging = False
         self.drag_position = QPoint()
         self.setAcceptDrops(True)
-        self.current_wallpaper = self.get_current_wallpaper()
-        self.current_bg_color = self.get_current_bg_color()
         self.video_window_initialized = False
         self.last_known_position = 0.0
         self.is_toggling_fullscreen = False
@@ -1490,9 +1510,6 @@ class LDBPlayer(QMainWindow):
         self.load_config()
         self.session = requests.Session()
         self.update_tray_actions()
-        if self.current_wallpaper == "" and self.playback_state in ['playing', 'paused']:
-            self.original_wallpaper = self.saved_original_wallpaper
-            self.original_bg_color = self.saved_original_bg_color
         self.event_manager = self.player.event_manager()
         self.event_manager.event_attach(vlc.EventType.MediaPlayerPlaying, lambda event: self.handle_playing_event(event))
         self.event_manager.event_attach(vlc.EventType.MediaPlayerStopped, lambda event: self.handle_stop_event(event))
@@ -1503,6 +1520,7 @@ class LDBPlayer(QMainWindow):
             self.fullscreen_control_dialog = FullscreenControlDialog(self)
             self.fullscreen_control_dialog.hide()
         self.autoplay_last_video()
+        self.update_slider_state()
         self.update_tray_actions()
         if '--autostart' not in sys.argv:
             QTimer.singleShot(50, self.bring_to_front)
@@ -1522,6 +1540,19 @@ class LDBPlayer(QMainWindow):
         else:
             self.current_video_label.setToolTip("")
         return truncated_text
+
+    def get_current_video_display_text(self):
+            if not self.playlist:
+                return "Playlist is empty"
+            if 0 <= self.current_video_index < len(self.playlist):
+                video_name = os.path.basename(self.playlist[self.current_video_index])
+                return f"Not playing - {video_name}"
+            return "No video playing"
+
+    def update_slider_state(self):
+        state = self.player.get_state()
+        is_active = state in (vlc.State.Playing, vlc.State.Paused)
+        self.slider.setEnabled(is_active)
 
     def is_duplicate_file(self, new_file, existing_files):
         new_name = os.path.basename(new_file)
@@ -1609,34 +1640,6 @@ class LDBPlayer(QMainWindow):
         else:
             event.ignore()
 
-    def get_current_wallpaper(self):
-        SPI_GETDESKWALLPAPER = 0x0073
-        buffer = ctypes.create_unicode_buffer(260)
-        ctypes.windll.user32.SystemParametersInfoW(SPI_GETDESKWALLPAPER, 260, buffer, 0)
-        return buffer.value
-
-    def get_current_bg_color(self):
-        try:
-            key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Control Panel\Colors")
-            value, _ = winreg.QueryValueEx(key, "Background")
-            winreg.CloseKey(key)
-            return value
-        except (FileNotFoundError, OSError):
-            return "0 0 0"
-
-    def set_wallpaper(self, path):
-        SPI_SETDESKWALLPAPER = 0x0014
-        ctypes.windll.user32.SystemParametersInfoW(SPI_SETDESKWALLPAPER, 0, path, 3)
-
-    def set_bg_color(self, rgb_str):
-        try:
-            key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Control Panel\Colors", 0, winreg.KEY_SET_VALUE)
-            winreg.SetValueEx(key, "Background", 0, winreg.REG_SZ, rgb_str)
-            winreg.CloseKey(key)
-            ctypes.windll.user32.SystemParametersInfoW(0x0014, 0, None, 3)
-        except Exception as e:
-            logging.error(f"Failed to set background color: {e}")
-
     def init_ui(self):
         central_frame = QFrame(self)
         central_frame.setObjectName("centralFrame")
@@ -1644,16 +1647,15 @@ class LDBPlayer(QMainWindow):
         self.central_frame = central_frame
         self.setCentralWidget(central_frame)
         main_layout = QVBoxLayout(central_frame)
-        main_layout.setContentsMargins(10, 10, 10, 10)
+        main_layout.setContentsMargins(20, 10, 20, 0)
         main_layout.setSpacing(10)
         video_layout = QHBoxLayout()
         video_layout.setSpacing(10)
-        self.current_video_label = QLabel("No video playing")
-        self.current_video_label.setFixedWidth(400)
+        self.current_video_label = QLabel(self.get_current_video_display_text())
+        self.current_video_label.setFixedWidth(480)
         self.current_video_label.setMinimumHeight(32)
         video_layout.addWidget(self.current_video_label)
         main_layout.addLayout(video_layout)
-        main_layout.addSpacing(10)
         self.slider = QSlider(Qt.Orientation.Horizontal)
         self.slider.setMinimum(0)
         self.slider.setMaximum(1000)
@@ -1707,6 +1709,7 @@ class LDBPlayer(QMainWindow):
         self.slider.sliderPressed.connect(handle_slider_pressed)
         self.slider.sliderReleased.connect(handle_slider_released)
         self.slider.sliderMoved.connect(self.seek)
+        self.slider.setEnabled(False)
         main_layout.addWidget(self.slider)
         control_layout = QHBoxLayout()
         control_layout.setSpacing(10)
@@ -1935,7 +1938,7 @@ class LDBPlayer(QMainWindow):
             }
         """)
         self.play_action = QAction("Play", self)
-        self.play_action.triggered.connect(self.tray_play)
+        self.play_action.triggered.connect(self.play_pause)
         tray_menu.addAction(self.play_action)
         self.stop_action = QAction("Stop", self)
         self.stop_action.triggered.connect(self.stop)
@@ -1950,25 +1953,6 @@ class LDBPlayer(QMainWindow):
         self.tray_icon.setContextMenu(tray_menu)
         self.tray_icon.activated.connect(self.tray_activated)
         self.tray_icon.show()
-
-    def tray_play(self):
-        if not self.playlist or self.media_list.count() == 0:
-            return
-        if not hasattr(self, 'video_window') or not self.video_window or sip.isdeleted(self.video_window):
-            self.setup_video_window(is_fullscreen=self.is_fullscreen)
-        self.video_window.show()
-        if self.is_paused or self.player.get_state() != vlc.State.Playing:
-            self.list_player.play_item_at_index(self.current_video_index)
-            self.play_pause_button.setIcon(QIcon(resource_path("icons/pause_icon.png")))
-            self.play_pause_button.setToolTip("Pause (Space)")
-            self.is_paused = False
-            video_name = os.path.basename(self.playlist[self.current_video_index])
-            self.current_video_label.setText(self.truncate_label_text(video_name))
-            QTimer.singleShot(100, self.ensure_playing_and_set_audio)
-        self.save_config()
-        self.update_tray_actions()
-        self.update_control_dialog()
-        self.update_fullscreen_button_state()
 
     def update_tray_actions(self):
         if self.play_action and self.stop_action:
@@ -2017,6 +2001,41 @@ class LDBPlayer(QMainWindow):
             except FileNotFoundError:
                 pass
 
+    def get_available_monitors(self):
+        screens = QApplication.screens()
+        monitors = []
+        for i, screen in enumerate(screens):
+            manufacturer = screen.manufacturer().strip()
+            model = screen.model().strip()
+            name = screen.name().strip()
+
+            if manufacturer and model:
+                display_name = f"{manufacturer} {model}"
+            elif model:
+                display_name = model
+            elif manufacturer:
+                display_name = manufacturer
+            elif name:
+                display_name = name
+            else:
+                display_name = f"Monitor {i}"
+
+            geom = screen.geometry()
+            display_name += f" - {geom.width()}x{geom.height()}"
+
+            display_name += f" @ ({geom.x()}, {geom.y()})"
+
+            monitors.append(display_name)
+        return monitors
+
+    def get_valid_monitor_index(self):
+        screens = QApplication.screens()
+        if self.selected_monitor_index < len(screens):
+            return self.selected_monitor_index
+        self.selected_monitor_index = 0
+        self.save_config()
+        return 0
+
     def setup_video_window(self, is_fullscreen=False):
         if hasattr(self, 'video_window') and self.video_window:
             try:
@@ -2032,10 +2051,15 @@ class LDBPlayer(QMainWindow):
                 self.video_window = None
 
         self.video_window = VideoWindow(self)
+
+        screens = QApplication.screens()
+        target_index = self.get_valid_monitor_index()
+        target_screen = screens[target_index] if target_index < len(screens) else QApplication.primaryScreen()
+
         if is_fullscreen:
             self.video_window.enter_fullscreen()
         else:
-            self.video_window.enter_desktop()
+            self.video_window.enter_desktop(target_screen)
         win_id = int(self.video_window.winId())
         self.player.set_hwnd(win_id)
         if not is_fullscreen:
@@ -2064,7 +2088,7 @@ class LDBPlayer(QMainWindow):
             current_position = self.player.get_position() if was_playing and self.player.get_position() >= 0 else 0.0
             self.last_known_position = current_position
             current_index = self.current_video_index
-            video_name = os.path.basename(self.playlist[current_index]) if self.playlist and 0 <= current_index < len(self.playlist) else "No video playing"
+            video_name = os.path.basename(self.playlist[current_index]) if self.playlist and 0 <= current_index < len(self.playlist) else self.get_current_video_display_text()
 
             self.player.set_hwnd(0)
             self.video_window.hide()
@@ -2092,7 +2116,7 @@ class LDBPlayer(QMainWindow):
                 self.play_pause_button.setIcon(QIcon(resource_path("icons/play_icon.png")))
                 self.play_pause_button.setToolTip("Play (Space)")
                 self.is_paused = False
-                self.current_video_label.setText(self.truncate_label_text("No video playing" if self.playlist else "Playlist is empty"))
+                self.current_video_label.setText(self.truncate_label_text(self.get_current_video_display_text()))
             self.fullscreen_button.setIcon(QIcon(resource_path("icons/exit_fullscreen_icon.png" if self.is_fullscreen else "icons/fullscreen_icon.png")))
             self.fullscreen_button.setToolTip("Exit Fullscreen (F)" if self.is_fullscreen else "Fullscreen (F)")
             self._finalize_toggle()
@@ -2170,8 +2194,6 @@ class LDBPlayer(QMainWindow):
                     self.move(QPoint(window_pos['x'], window_pos['y']))
                     self.adjust_position()
                 self.playback_state = config.get('playback_state', 'stopped')
-                self.saved_original_wallpaper = config.get('saved_original_wallpaper', self.original_wallpaper)
-                self.saved_original_bg_color = config.get('saved_original_bg_color', self.original_bg_color)
                 if self.repeat_mode not in ['one', 'all']:
                     self.repeat_mode = 'one'
                 if self.current_video_index >= len(self.playlist):
@@ -2181,11 +2203,13 @@ class LDBPlayer(QMainWindow):
                     self.list_player.set_playback_mode(vlc.PlaybackMode.repeat)
                 else:
                     self.list_player.set_playback_mode(vlc.PlaybackMode.loop)
+                self.selected_monitor_index = config.get('selected_monitor_index', 0)
         except (FileNotFoundError, json.JSONDecodeError):
             self.repeat_mode = 'one'
             self.playback_state = 'stopped'
             self.list_player.set_playback_mode(vlc.PlaybackMode.repeat)
             self.current_video_label.setText(self.truncate_label_text("Playlist is empty"))
+            self.selected_monitor_index = 0
 
     def save_config(self):
         state = self.player.get_state()
@@ -2205,8 +2229,7 @@ class LDBPlayer(QMainWindow):
             'window_pos': {'x': self.pos().x(), 'y': self.pos().y()},
             'window_size': {'width': self.size().width(), 'height': self.size().height()},
             'playback_state': playback_state,
-            'saved_original_wallpaper': self.original_wallpaper,
-            'saved_original_bg_color': self.original_bg_color,
+            'selected_monitor_index': self.selected_monitor_index,
         }
         with open(self.config_file, 'w', encoding='utf-8') as f:
             json.dump(config, f)
@@ -2214,15 +2237,21 @@ class LDBPlayer(QMainWindow):
     def adjust_position(self):
         screen = QApplication.primaryScreen().availableGeometry()
         window_rect = self.geometry()
-        if window_rect.right() > screen.right():
-            window_rect.moveRight(screen.right())
-        if window_rect.bottom() > screen.bottom():
-            window_rect.moveBottom(screen.bottom())
-        if window_rect.left() < screen.left():
-            window_rect.moveLeft(screen.left())
-        if window_rect.top() < screen.top():
-            window_rect.moveTop(screen.top())
-        self.setGeometry(window_rect)
+
+        if (window_rect.right() > screen.right() or 
+            window_rect.bottom() > screen.bottom() or 
+            window_rect.left() < screen.left() or 
+            window_rect.top() < screen.top()):
+
+            if window_rect.right() > screen.right():
+                window_rect.moveRight(screen.right())
+            if window_rect.bottom() > screen.bottom():
+                window_rect.moveBottom(screen.bottom())
+            if window_rect.left() < screen.left():
+                window_rect.moveLeft(screen.left())
+            if window_rect.top() < screen.top():
+                window_rect.moveTop(screen.top())
+            self.setGeometry(window_rect)
 
     def ensure_playing_and_set_audio(self):
         if self.player.get_state() in (vlc.State.Playing, vlc.State.Paused):
@@ -2240,13 +2269,13 @@ class LDBPlayer(QMainWindow):
             if not hasattr(self, 'video_window') or not self.video_window or sip.isdeleted(self.video_window):
                 self.setup_video_window(is_fullscreen=self.is_fullscreen)
             self.video_window.show()
-            QTimer.singleShot(200, lambda: self.list_player.play_item_at_index(self.current_video_index))
+            QTimer.singleShot(1500, lambda: self.list_player.play_item_at_index(self.current_video_index))
             self.play_pause_button.setIcon(QIcon(resource_path("icons/pause_icon.png")))
             self.play_pause_button.setToolTip("Pause (Space)")
             self.is_paused = False
             video_name = os.path.basename(self.playlist[self.current_video_index])
             self.current_video_label.setText(self.truncate_label_text(video_name))
-            QTimer.singleShot(300, self.ensure_playing_and_set_audio)
+            QTimer.singleShot(1600, self.ensure_playing_and_set_audio)
         else:
             if hasattr(self, 'video_window') and self.video_window:
                 self.video_window.hide()
@@ -2360,8 +2389,9 @@ class LDBPlayer(QMainWindow):
             self.current_video_label.setText(self.truncate_label_text(video_name))
         else:
             self.current_video_index = min(self.current_video_index, len(self.playlist) - 1) if self.playlist else 0
-            self.current_video_label.setText(self.truncate_label_text("No video playing" if self.playlist else "Playlist is empty"))
+            self.current_video_label.setText(self.truncate_label_text(self.get_current_video_display_text()))
         self.update_fullscreen_button_state()
+        self.update_slider_state()
 
     def play_pause(self):
         if self.list_player.is_playing():
@@ -2398,8 +2428,11 @@ class LDBPlayer(QMainWindow):
         self.update_control_dialog()
         self.update_fullscreen_button_state()
         self.update_tray_actions()
+        self.update_slider_state()
 
     def stop(self):
+        if not self.playlist or self.player.get_state() == vlc.State.Stopped:
+            return
         self.list_player.stop()
         if hasattr(self, 'video_window') and self.video_window and not sip.isdeleted(self.video_window):
             self.player.set_hwnd(0)
@@ -2412,12 +2445,9 @@ class LDBPlayer(QMainWindow):
         self.play_pause_button.setIcon(QIcon(resource_path("icons/play_icon.png")))
         self.play_pause_button.setToolTip("Play (Space)")
         self.is_paused = False
-        self.current_video_label.setText(self.truncate_label_text("No video playing" if self.playlist else "Playlist is empty"))
+        self.current_video_label.setText(self.truncate_label_text(self.get_current_video_display_text()))
         self.duration_label.setText("--:-- / --:--")
-        if self.original_bg_color:
-            self.set_bg_color(self.original_bg_color)
-        if self.original_wallpaper:
-            self.set_wallpaper(self.original_wallpaper)
+        self.update_slider_state()
         if self.fullscreen_enabled and self.is_fullscreen:
             self.toggle_fullscreen()
         self.save_config()
@@ -2559,7 +2589,7 @@ class LDBPlayer(QMainWindow):
             else:
                 self.current_video_index = 0
                 self.list_player.stop()
-                self.current_video_label.setText(self.truncate_label_text("No video playing"))
+                self.current_video_label.setText(self.truncate_label_text(self.get_current_video_display_text()))
                 self.video_window.hide()
                 self.play_pause_button.setIcon(QIcon(resource_path("icons/play_icon.png")))
                 self.play_pause_button.setToolTip("Play (Space)")
@@ -2572,11 +2602,12 @@ class LDBPlayer(QMainWindow):
         elif 0 <= self.current_video_index < len(self.playlist):
             video_name = os.path.basename(self.playlist[self.current_video_index])
         else:
-            video_name = "No video playing"
+            video_name = self.get_current_video_display_text()
             self.current_video_index = 0
         self.current_video_label.setText(self.truncate_label_text(video_name))
         QApplication.postEvent(self, CustomEvent(video_name, self.current_video_index))
         self.update_tray_actions()
+        self.update_slider_state()
 
     def update_ui(self, video_name, index):
         if self.player.get_state() == vlc.State.Playing:
@@ -2587,16 +2618,13 @@ class LDBPlayer(QMainWindow):
             self.play_pause_button.setToolTip("Pause (Space)")
             self.is_paused = False
             self.update_fullscreen_button_state()
+            self.update_slider_state()
 
     def handle_stop_event(self, event):
         if hasattr(self, 'video_window') and self.video_window and not sip.isdeleted(self.video_window):
             self.video_window.hide()
-        self.current_video_label.setText(self.truncate_label_text("No video playing" if self.playlist else "Playlist is empty"))
+        self.current_video_label.setText(self.truncate_label_text(self.get_current_video_display_text()))
         self.duration_label.setText("--:-- / --:--")
-        if self.original_bg_color:
-            self.set_bg_color(self.original_bg_color)
-        if self.original_wallpaper:
-            self.set_wallpaper(self.original_wallpaper)
         self.update_tray_actions()
 
     def handle_error_event(self, event):
@@ -2608,10 +2636,6 @@ class LDBPlayer(QMainWindow):
         pass
 
     def quit_application(self):
-        if self.original_bg_color:
-            self.set_bg_color(self.original_bg_color)
-        if self.original_wallpaper:
-            self.set_wallpaper(self.original_wallpaper)
         self.stop()
         QApplication.quit()
 
