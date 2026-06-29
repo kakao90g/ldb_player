@@ -10,9 +10,9 @@ LDB Player is a Windows-specific media player that transforms your desktop into 
 - Playlist management: Add, remove, shuffle, save, and load playlists (with drag-and-drop support).
 - Global hotkeys for playback control, volume adjustment, seeking, and navigation.
 - Repeat modes (single video or entire playlist).
-- Autostart settings and hotkey reference.
+- Auto start feature on system restart adjustable in Settings.
 - Dark-themed, modern user interface.
-- Built-in update checker with automatic updater support.
+- Built-in update checker with updater fetch support.
 
 ## Requirements
 - Windows 11.
@@ -48,7 +48,7 @@ The updater is a separate script (updater.py) that handles downloading and repla
 - Add videos via drag-and-drop or the playlist dialog.
 - Control playback with hotkeys: Space (play/pause), Arrow keys (seek/volume), etc. (View the full list in Settings > Hotkeys).
 - Configuration is saved in %APPDATA%\LDBPlayer.
-- Check for updates via Settings > Check for Updates. If an update is available, the app can run the updater automatically (requires updater.exe in the app directory).
+- Check for updates via Settings > Check for Updates. If an update is available, the app can download the updater and patch the new version automatically.
 
 ## Credits and Acknowledgments
 - Powered by VLC media player (libvlc) from VideoLAN: https://www.videolan.org/vlc/
