@@ -2002,39 +2002,46 @@ class LDBPlayer(QMainWindow):
                 pass
 
     def get_available_monitors(self):
-        screens = QApplication.screens()
-        monitors = []
-        for i, screen in enumerate(screens):
-            manufacturer = screen.manufacturer().strip()
-            model = screen.model().strip()
-            name = screen.name().strip()
+        try:
+            screens = QApplication.screens()
+            monitors = []
+            for i, screen in enumerate(screens):
+                manufacturer = screen.manufacturer().strip()
+                model = screen.model().strip()
+                name = screen.name().strip()
 
-            if manufacturer and model:
-                display_name = f"{manufacturer} {model}"
-            elif model:
-                display_name = model
-            elif manufacturer:
-                display_name = manufacturer
-            elif name:
-                display_name = name
-            else:
-                display_name = f"Monitor {i}"
+                if manufacturer and model:
+                    display_name = f"{manufacturer} {model}"
+                elif model:
+                    display_name = model
+                elif manufacturer:
+                    display_name = manufacturer
+                elif name:
+                    display_name = name
+                else:
+                    display_name = f"Monitor {i}"
 
-            geom = screen.geometry()
-            display_name += f" - {geom.width()}x{geom.height()}"
+                geom = screen.geometry()
+                display_name += f" - {geom.width()}x{geom.height()}"
+                display_name += f" @ ({geom.x()}, {geom.y()})"
 
-            display_name += f" @ ({geom.x()}, {geom.y()})"
-
-            monitors.append(display_name)
-        return monitors
+                monitors.append(display_name)
+            return monitors
+        except Exception as e:
+            logging.error(f"Monitor detection failed: {e}")
+            return ["Primary Monitor"]
 
     def get_valid_monitor_index(self):
-        screens = QApplication.screens()
-        if self.selected_monitor_index < len(screens):
-            return self.selected_monitor_index
-        self.selected_monitor_index = 0
-        self.save_config()
-        return 0
+        try:
+            screens = QApplication.screens()
+            if self.selected_monitor_index < len(screens):
+                return self.selected_monitor_index
+            self.selected_monitor_index = 0
+            self.save_config()
+            return 0
+        except Exception:
+            self.selected_monitor_index = 0
+            return 0
 
     def setup_video_window(self, is_fullscreen=False):
         if hasattr(self, 'video_window') and self.video_window:

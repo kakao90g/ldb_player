@@ -12,11 +12,11 @@ LDB Player is a Windows-specific media player that transforms your desktop into 
 - Repeat modes (single video or entire playlist).
 - Auto start feature on system restart adjustable in Settings.
 - Dark-themed, modern user interface.
-- Built-in update checker with updater fetch support.
+- Built-in update checker with updater download support.
 
 ## Requirements
 - Windows 11.
-- VLC media player installed (download from https://www.videolan.org/vlc/).
+- VLC media player (optional but recommended, download from https://www.videolan.org/vlc/).
 - Python 3.10+ (required only for running from source).
 
 ## Downloads (For End Users)
@@ -66,8 +66,8 @@ Join the community:
 ## Version Changes
 - v1.0.2
     - Multi-display support
-    - Improved autostart stability
-    - Removed desktop wallpaper tampering (cleaner operation)
+    - Fixed auto start stability
+    - Removed desktop wallpaper manipulation
     - Various improvements and bug fixes
 - v1.0.0
     - Minimal bug fixes
