@@ -30,7 +30,7 @@ def resource_path(relative_path):
 
 logging.basicConfig(level=logging.CRITICAL)
 
-VERSION = "1.0.2"
+VERSION = "1.0.5"
 
 QSS_STYLE = """
 QMainWindow, QDialog {
@@ -1043,6 +1043,8 @@ class PlaylistDialog(DialogBase):
         self.accept()
 
     def accept(self):
+        self.temp_playlist = [f for f in self.temp_playlist if os.path.exists(f)]
+
         current_video = (self.parent.playlist[self.parent.current_video_index]
                         if self.parent.playlist and 0 <= self.parent.current_video_index < len(self.parent.playlist)
                         else None)
@@ -1522,6 +1524,7 @@ class LDBPlayer(QMainWindow):
         self.autoplay_last_video()
         self.update_slider_state()
         self.update_tray_actions()
+        QTimer.singleShot(1500, self.play_welcome_video)
         if '--autostart' not in sys.argv:
             QTimer.singleShot(50, self.bring_to_front)
 
@@ -2238,8 +2241,12 @@ class LDBPlayer(QMainWindow):
             'playback_state': playback_state,
             'selected_monitor_index': self.selected_monitor_index,
         }
+
+        if 'welcome_shown' not in config:
+            config['welcome_shown'] = True
+
         with open(self.config_file, 'w', encoding='utf-8') as f:
-            json.dump(config, f)
+            json.dump(config, f, indent=2)
 
     def adjust_position(self):
         screen = QApplication.primaryScreen().availableGeometry()
@@ -2266,6 +2273,51 @@ class LDBPlayer(QMainWindow):
             self.player.audio_set_mute(self.is_muted)
         else:
             QTimer.singleShot(50, self.ensure_playing_and_set_audio)
+
+    def play_welcome_video(self):
+        welcome_shown = False
+        try:
+            if os.path.exists(self.config_file):
+                with open(self.config_file, 'r', encoding='utf-8') as f:
+                    config = json.load(f)
+                    welcome_shown = config.get('welcome_shown', False)
+        except:
+            pass
+
+        if welcome_shown:
+            return
+
+        try:
+            os.makedirs(self.config_dir, exist_ok=True)
+            config = {}
+            if os.path.exists(self.config_file):
+                with open(self.config_file, 'r', encoding='utf-8') as f:
+                    config = json.load(f)
+            config['welcome_shown'] = True
+            with open(self.config_file, 'w', encoding='utf-8') as f:
+                json.dump(config, f, indent=2)
+        except:
+            pass
+
+        welcome_path = resource_path("sample/welcome.mp4")
+        if not os.path.exists(welcome_path):
+            return
+
+        try:
+            if not hasattr(self, 'video_window') or not self.video_window or sip.isdeleted(self.video_window):
+                self.setup_video_window(is_fullscreen=self.is_fullscreen)
+
+            self.video_window.show()
+
+            self.playlist = [welcome_path]
+            self.original_playlist = [welcome_path]
+            self.current_video_index = 0
+
+            self.load_playlist()
+            self.list_player.play_item_at_index(0)
+
+        except Exception:
+            pass
 
     def autoplay_last_video(self):
         if (self.playback_state in ['playing', 'paused'] and self.repeat_mode in ['one', 'all'] and
@@ -2400,6 +2452,20 @@ class LDBPlayer(QMainWindow):
         self.update_fullscreen_button_state()
         self.update_slider_state()
 
+    def ensure_valid_current_video(self):
+        if not self.playlist:
+            return False
+
+        if self.current_video_index >= len(self.playlist) or not os.path.exists(self.playlist[self.current_video_index]):
+            self.playlist = [p for p in self.playlist if os.path.exists(p)]
+            self.original_playlist = self.playlist.copy()
+            self.current_video_index = min(self.current_video_index, len(self.playlist) - 1) if self.playlist else 0
+            self.save_config()
+            self.load_playlist()
+            return bool(self.playlist)
+
+        return True
+
     def play_pause(self):
         if self.list_player.is_playing():
             self.list_player.pause()
@@ -2410,6 +2476,11 @@ class LDBPlayer(QMainWindow):
             if not self.playlist or self.media_list.count() == 0:
                 self.update_fullscreen_button_state()
                 return
+
+            if not self.ensure_valid_current_video():
+                self.update_fullscreen_button_state()
+                return
+
             if not hasattr(self, 'video_window') or not self.video_window or sip.isdeleted(self.video_window):
                 self.setup_video_window(is_fullscreen=self.is_fullscreen)
             self.video_window.show()
@@ -2517,6 +2588,10 @@ class LDBPlayer(QMainWindow):
         if not self.playlist or self.media_list.count() == 0:
             return
         self.current_video_index = (self.current_video_index + 1) % len(self.playlist)
+
+        if not self.ensure_valid_current_video():
+            return
+
         if not hasattr(self, 'video_window') or not self.video_window or sip.isdeleted(self.video_window):
             self.setup_video_window(is_fullscreen=self.is_fullscreen)
         self.video_window.show()
@@ -2534,6 +2609,10 @@ class LDBPlayer(QMainWindow):
         if not self.playlist or self.media_list.count() == 0:
             return
         self.current_video_index = (self.current_video_index - 1) % len(self.playlist)
+
+        if not self.ensure_valid_current_video():
+            return
+
         if not hasattr(self, 'video_window') or not self.video_window or sip.isdeleted(self.video_window):
             self.setup_video_window(is_fullscreen=self.is_fullscreen)
         self.video_window.show()

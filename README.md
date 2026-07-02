@@ -64,9 +64,12 @@ Join the community:
 - Discord: https://discord.gg/TAfUNGHYR3
 
 ## Version Changes
+- v1.0.5
+    - Added new welcome screen for new users
+    - Minor bug fixes
 - v1.0.2
     - Multi-display support
-    - Fixed auto start stability
+    - Improved auto start stability
     - Removed desktop wallpaper manipulation
     - Various improvements and bug fixes
 - v1.0.0
