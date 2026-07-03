@@ -30,7 +30,7 @@ def resource_path(relative_path):
 
 logging.basicConfig(level=logging.CRITICAL)
 
-VERSION = "1.0.5"
+VERSION = "1.0.6"
 
 QSS_STYLE = """
 QMainWindow, QDialog {
@@ -1468,6 +1468,50 @@ class VideoWindow(QWidget):
             self.parent.toggle_fullscreen()
             event.accept()
 
+class CustomTrayMenu(QMenu):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setStyleSheet("""
+            QMenu {
+                background-color: #353535;
+                color: white;
+                border: 1px solid #555555;
+                border-radius: 8px;
+                padding: 4px 0;
+            }
+            QMenu::item {
+                padding: 8px 24px;
+                border-radius: 4px;
+            }
+            QMenu::item:selected {
+                background-color: #252525;
+            }
+            QMenu::item:disabled {
+                color: #666666;
+                background-color: #353535;
+            }
+            QMenu::separator {
+                height: 1px;
+                background-color: #555555;
+                margin: 4px 0;
+            }
+        """)
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        tray_geo = self.parent().tray_icon.geometry()
+        menu_size = self.sizeHint()
+        screen = QApplication.primaryScreen().availableGeometry()
+
+        x = tray_geo.center().x() - menu_size.width() // 2
+        y = tray_geo.top() - menu_size.height() - 10
+
+        if y < screen.top():
+            y = tray_geo.bottom() + 8
+        x = max(screen.left() + 10, min(x, screen.right() - menu_size.width() - 10))
+
+        self.move(x, y)
+
 class LDBPlayer(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -1511,19 +1555,17 @@ class LDBPlayer(QMainWindow):
         self.init_system_tray()
         self.load_config()
         self.session = requests.Session()
-        self.update_tray_actions()
         self.event_manager = self.player.event_manager()
         self.event_manager.event_attach(vlc.EventType.MediaPlayerPlaying, lambda event: self.handle_playing_event(event))
         self.event_manager.event_attach(vlc.EventType.MediaPlayerStopped, lambda event: self.handle_stop_event(event))
         self.event_manager.event_attach(vlc.EventType.MediaPlayerEncounteredError, lambda event: self.handle_error_event(event))
         self.event_manager.event_attach(vlc.EventType.MediaPlayerEndReached, lambda event: self.handle_end_reached_event(event))
-        self.update_tray_actions()
         if self.fullscreen_enabled:
             self.fullscreen_control_dialog = FullscreenControlDialog(self)
             self.fullscreen_control_dialog.hide()
         self.autoplay_last_video()
-        self.update_slider_state()
         self.update_tray_actions()
+        self.update_slider_state()
         QTimer.singleShot(1500, self.play_welcome_video)
         if '--autostart' not in sys.argv:
             QTimer.singleShot(50, self.bring_to_front)
@@ -1919,51 +1961,43 @@ class LDBPlayer(QMainWindow):
     def init_system_tray(self):
         self.tray_icon = QSystemTrayIcon(self)
         self.tray_icon.setToolTip("LDB Player")
-        tray_menu = QMenu()
-        tray_menu.setStyleSheet("""
-            QMenu {
-                background-color: #353535;
-                color: white;
-                border: 1px solid #555555;
-                border-radius: 5px;
-            }
-            QMenu::item {
-                background-color: #353535;
-                color: white;
-                padding: 5px 20px;
-            }
-            QMenu::item:selected {
-                background-color: #252525;
-            }
-            QMenu::item:disabled {
-                color: #666666;
-                background-color: #353535;
-            }
-        """)
+
+        self.tray_menu = CustomTrayMenu(self)
+
         self.play_action = QAction("Play", self)
         self.play_action.triggered.connect(self.play_pause)
-        tray_menu.addAction(self.play_action)
+        self.tray_menu.addAction(self.play_action)
+
+        self.tray_menu.addSeparator()
+
         self.stop_action = QAction("Stop", self)
         self.stop_action.triggered.connect(self.stop)
-        tray_menu.addAction(self.stop_action)
+        self.tray_menu.addAction(self.stop_action)
+
+        self.tray_menu.addSeparator()
+
         show_action = QAction("Show", self)
         show_action.triggered.connect(self.restore_window)
-        tray_menu.addAction(show_action)
+        self.tray_menu.addAction(show_action)
+
+        self.tray_menu.addSeparator()
+
         quit_action = QAction("Quit", self)
         quit_action.triggered.connect(self.quit_application)
-        tray_menu.addAction(quit_action)
+        self.tray_menu.addAction(quit_action)
+
         self.tray_icon.setIcon(QIcon(resource_path("icons/tray_icon.png")))
-        self.tray_icon.setContextMenu(tray_menu)
+        self.tray_icon.setContextMenu(self.tray_menu)
         self.tray_icon.activated.connect(self.tray_activated)
         self.tray_icon.show()
 
     def update_tray_actions(self):
-        if self.play_action and self.stop_action:
-            state = self.player.get_state()
-            has_playlist = bool(self.playlist)
-            is_playing = state == vlc.State.Playing
-            self.play_action.setEnabled(has_playlist and not is_playing)
-            self.stop_action.setEnabled(has_playlist and (is_playing or state == vlc.State.Paused))
+            if hasattr(self, 'play_action') and hasattr(self, 'stop_action'):
+                state = self.player.get_state()
+                has_playlist = bool(self.playlist)
+                is_playing = state == vlc.State.Playing
+                self.play_action.setEnabled(has_playlist and not is_playing)
+                self.stop_action.setEnabled(has_playlist and (is_playing or state == vlc.State.Paused))
 
     def restore_window(self):
         if self.isMinimized():
@@ -2339,6 +2373,7 @@ class LDBPlayer(QMainWindow):
             if hasattr(self, 'video_window') and self.video_window:
                 self.video_window.hide()
             self.update_tray_actions()
+            self.update_slider_state()
 
     def open_settings(self):
         try:
@@ -2450,7 +2485,6 @@ class LDBPlayer(QMainWindow):
             self.current_video_index = min(self.current_video_index, len(self.playlist) - 1) if self.playlist else 0
             self.current_video_label.setText(self.truncate_label_text(self.get_current_video_display_text()))
         self.update_fullscreen_button_state()
-        self.update_slider_state()
 
     def ensure_valid_current_video(self):
         if not self.playlist:
@@ -2509,8 +2543,6 @@ class LDBPlayer(QMainWindow):
         self.update_slider_state()
 
     def stop(self):
-        if not self.playlist or self.player.get_state() == vlc.State.Stopped:
-            return
         self.list_player.stop()
         if hasattr(self, 'video_window') and self.video_window and not sip.isdeleted(self.video_window):
             self.player.set_hwnd(0)
@@ -2525,13 +2557,13 @@ class LDBPlayer(QMainWindow):
         self.is_paused = False
         self.current_video_label.setText(self.truncate_label_text(self.get_current_video_display_text()))
         self.duration_label.setText("--:-- / --:--")
-        self.update_slider_state()
         if self.fullscreen_enabled and self.is_fullscreen:
             self.toggle_fullscreen()
         self.save_config()
         self.update_control_dialog()
         self.update_fullscreen_button_state()
         self.update_tray_actions()
+        self.update_slider_state()
 
     def toggle_mute(self):
         self.is_muted = not self.is_muted
@@ -2704,7 +2736,6 @@ class LDBPlayer(QMainWindow):
             self.play_pause_button.setToolTip("Pause (Space)")
             self.is_paused = False
             self.update_fullscreen_button_state()
-            self.update_slider_state()
 
     def handle_stop_event(self, event):
         if hasattr(self, 'video_window') and self.video_window and not sip.isdeleted(self.video_window):
@@ -2712,6 +2743,7 @@ class LDBPlayer(QMainWindow):
         self.current_video_label.setText(self.truncate_label_text(self.get_current_video_display_text()))
         self.duration_label.setText("--:-- / --:--")
         self.update_tray_actions()
+        self.update_slider_state()
 
     def handle_error_event(self, event):
         dialog = MessageDialog(self, "Playback Error", "An error occurred during playback.")
