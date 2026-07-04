@@ -64,6 +64,9 @@ Join the community:
 - Discord: https://discord.gg/TAfUNGHYR3
 
 ## Version Changes
+- v1.0.8
+    - Improved performance and stability
+    - Optimized code
 - v1.0.6
     - Updated system tray menu
     - Fixed critical playback issue

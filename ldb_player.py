@@ -30,7 +30,7 @@ def resource_path(relative_path):
 
 logging.basicConfig(level=logging.CRITICAL)
 
-VERSION = "1.0.6"
+VERSION = "1.0.8"
 
 QSS_STYLE = """
 QMainWindow, QDialog {
@@ -149,9 +149,6 @@ QPushButton#fullscreenButton {
 QPushButton#fullscreenButton:hover {
     background-color: #252525;
     border: none;
-}
-QWidget#fullscreenControlDialog {
-    background-color: #353535;
 }
 QPushButton#exitFullscreenButton {
     background-color: transparent;
@@ -1120,253 +1117,6 @@ class PlaylistDialog(DialogBase):
         else:
             event.ignore()
 
-class FullscreenControlDialog(QWidget):
-    def __init__(self, parent):
-        super().__init__(parent)
-        self.setObjectName("fullscreenControlDialog")
-        self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.Window | Qt.WindowType.WindowStaysOnTopHint)
-        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
-        self.setWindowOpacity(0.9)
-        self.setWindowIcon(QIcon(resource_path("icons/tray_icon.png")))
-        self.parent = parent
-        self.hide_timer = QTimer(self)
-        self.hide_timer.setSingleShot(True)
-        self.hide_timer.timeout.connect(self.hide)
-        self.is_visible = False
-        self.initial_show = False
-        self.init_ui()
-        self.adjust_position()
-
-    def show_dialog(self):
-        if not self.is_visible:
-            self.is_visible = True
-            self.initial_show = True
-            self.adjust_position()
-            self.show()
-            self.raise_()
-            QTimer.singleShot(3000, self.start_hide_timer)
-
-    def start_hide_timer(self):
-        self.initial_show = False
-        self.reset_hide_timer()
-
-    def hide(self):
-        if self.is_visible:
-            self.is_visible = False
-            self.initial_show = False
-            super().hide()
-
-    def init_ui(self):
-        main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(10, 10, 10, 10)
-        main_layout.setSpacing(10)
-        main_layout.addSpacing(10)
-        video_layout = QHBoxLayout()
-        video_layout.setSpacing(10)
-        self.current_video_label = QLabel(self.parent.current_video_label.text())
-        self.current_video_label.setFixedWidth(400)
-        self.current_video_label.setMinimumHeight(32)
-        video_layout.addWidget(self.current_video_label)
-        main_layout.addWidget(self.current_video_label)
-        main_layout.addSpacing(10)
-        self.slider = QSlider(Qt.Orientation.Horizontal)
-        self.slider.setMinimum(0)
-        self.slider.setMaximum(1000)
-        self.slider.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-
-        def slider_mouse_press_event(event):
-            if event.button() == Qt.MouseButton.LeftButton and self.parent.player.get_state() in (vlc.State.Playing, vlc.State.Paused):
-                slider_width = self.slider.width()
-                click_x = event.position().x()
-                value_range = 1000 - 0
-                new_value = 0 + int((click_x / slider_width) * value_range)
-                new_value = max(0, min(1000, new_value))
-                handle_width = 16
-                current_value = self.slider.value()
-                handle_pos = (current_value / value_range) * slider_width
-                handle_rect = QRectF(handle_pos - handle_width / 2, 0, handle_width, self.slider.height())
-                self.slider.setValue(new_value)
-                self.parent.seek(new_value)
-                QSlider.mousePressEvent(self.slider, event)
-            else:
-                QSlider.mousePressEvent(self.slider, event)
-
-        def slider_wheel_event(event):
-            if self.parent.player.get_state() in (vlc.State.Playing, vlc.State.Paused):
-                delta = event.angleDelta().y()
-                current_time = self.parent.player.get_time()
-                jump_ms = 10000
-                new_time = current_time + (jump_ms if delta > 0 else -jump_ms)
-                new_time = max(0, min(new_time, self.parent.player.get_length()))
-                self.parent.player.set_time(new_time)
-                event.accept()
-
-        def handle_slider_pressed():
-            if self.parent.player.get_state() == vlc.State.Playing:
-                self.parent.was_playing_before_drag = True
-                self.parent.list_player.pause()
-                self.parent.is_paused = True
-            else:
-                self.parent.was_playing_before_drag = False
-
-        def handle_slider_released():
-            if hasattr(self.parent, 'was_playing_before_drag') and self.parent.was_playing_before_drag:
-                self.parent.list_player.play()
-                self.parent.is_paused = False
-                QTimer.singleShot(100, self.parent.ensure_playing_and_set_audio)
-            self.parent.was_playing_before_drag = False
-
-        self.slider.mousePressEvent = slider_mouse_press_event
-        self.slider.wheelEvent = slider_wheel_event
-        self.slider.sliderPressed.connect(handle_slider_pressed)
-        self.slider.sliderReleased.connect(handle_slider_released)
-        self.slider.sliderMoved.connect(self.parent.seek)
-        main_layout.addWidget(self.slider)
-        control_layout = QHBoxLayout()
-        control_layout.setSpacing(10)
-        self.playlist_button = QPushButton()
-        self.playlist_button.setObjectName("playlistButton")
-        self.playlist_button.setFixedSize(48, 48)
-        self.playlist_button.setIcon(QIcon(resource_path("icons/playlist_icon.png")))
-        self.playlist_button.setToolTip("Playlist (Q)")
-        self.playlist_button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self.playlist_button.clicked.connect(self.parent.open_playlist)
-        control_layout.addWidget(self.playlist_button)
-        self.play_pause_button = QPushButton()
-        self.play_pause_button.setObjectName("playButton")
-        self.play_pause_button.setFixedSize(48, 48)
-        self.play_pause_button.setIcon(QIcon(resource_path("icons/play_icon.png")))
-        self.play_pause_button.setToolTip("Play (Space)")
-        self.play_pause_button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self.play_pause_button.clicked.connect(self.parent.play_pause)
-        control_layout.addWidget(self.play_pause_button)
-        self.stop_button = QPushButton()
-        self.stop_button.setObjectName("stopButton")
-        self.stop_button.setFixedSize(48, 48)
-        self.stop_button.setIcon(QIcon(resource_path("icons/stop_icon.png")))
-        self.stop_button.setToolTip("Stop (S)")
-        self.stop_button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self.stop_button.clicked.connect(self.parent.stop)
-        control_layout.addWidget(self.stop_button)
-        self.prev_button = QPushButton()
-        self.prev_button.setObjectName("prevButton")
-        self.prev_button.setFixedSize(48, 48)
-        self.prev_button.setIcon(QIcon(resource_path("icons/prev_icon.png")))
-        self.prev_button.setToolTip("Previous (P)")
-        self.prev_button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self.prev_button.clicked.connect(self.parent.play_previous)
-        control_layout.addWidget(self.prev_button)
-        self.next_button = QPushButton()
-        self.next_button.setObjectName("nextButton")
-        self.next_button.setFixedSize(48, 48)
-        self.next_button.setIcon(QIcon(resource_path("icons/next_icon.png")))
-        self.next_button.setToolTip("Next (N)")
-        self.next_button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self.next_button.clicked.connect(self.parent.play_next)
-        control_layout.addWidget(self.next_button)
-        self.repeat_button = QPushButton()
-        self.repeat_button.setObjectName("repeatButton")
-        self.repeat_button.setFixedSize(48, 48)
-        self.repeat_button.setIcon(QIcon(resource_path(f"icons/repeat_{self.parent.repeat_mode}_icon.png")))
-        self.repeat_button.setToolTip("Loop (L)")
-        self.repeat_button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self.repeat_button.clicked.connect(lambda: self.parent.toggle_repeat(None))
-        control_layout.addWidget(self.repeat_button)
-        self.mute_button = QPushButton()
-        self.mute_button.setObjectName("muteButton")
-        self.mute_button.setFixedSize(48, 48)
-        self.mute_button.setIcon(QIcon(resource_path("icons/mute_icon.png" if self.parent.is_muted else "icons/unmute_icon.png")))
-        self.mute_button.setToolTip("Mute (M)")
-        self.mute_button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self.mute_button.clicked.connect(self.parent.toggle_mute)
-        control_layout.addWidget(self.mute_button)
-        self.volume_slider = QSlider(Qt.Orientation.Horizontal)
-        self.volume_slider.setObjectName("volumeSlider")
-        self.volume_slider.setMinimum(0)
-        self.volume_slider.setMaximum(200)
-        self.volume_slider.setValue(self.parent.volume_slider.value())
-        self.volume_slider.setFixedWidth(150)
-        self.volume_slider.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self.volume_slider.valueChanged.connect(self.parent.set_volume)
-
-        def volume_mouse_press_event(event):
-            if event.button() == Qt.MouseButton.LeftButton:
-                slider_width = self.volume_slider.width()
-                click_x = event.position().x()
-                value_range = 200 - 0
-                new_value = 0 + int((click_x / slider_width) * value_range)
-                new_value = max(0, min(200, new_value))
-                self.volume_slider.setValue(new_value)
-                self.parent.set_volume(new_value)
-                QSlider.mousePressEvent(self.volume_slider, event)
-            else:
-                QSlider.mousePressEvent(self.volume_slider, event)
-
-        def volume_wheel_event(event):
-            delta = event.angleDelta().y()
-            self.parent.adjust_volume_by_wheel(delta)
-            event.accept()
-
-        self.volume_slider.mousePressEvent = volume_mouse_press_event
-        self.volume_slider.wheelEvent = volume_wheel_event
-        self.volume_slider.valueChanged.connect(self.parent.set_volume)
-        control_layout.addWidget(self.volume_slider)
-        self.volume_label = QLabel(self.parent.volume_label.text())
-        self.volume_label.setObjectName("volumeLabel")
-        control_layout.addWidget(self.volume_label)
-        control_layout.addSpacing(20)
-        self.duration_label = QLabel(self.parent.duration_label.text())
-        self.duration_label.setObjectName("durationLabel")
-        control_layout.addWidget(self.duration_label)
-        control_layout.addSpacing(20)
-        self.exit_fullscreen_button = QPushButton()
-        self.exit_fullscreen_button.setObjectName("exitFullscreenButton")
-        self.exit_fullscreen_button.setFixedSize(48, 48)
-        self.exit_fullscreen_button.setIcon(QIcon(resource_path("icons/exit_fullscreen_icon.png")))
-        self.exit_fullscreen_button.setToolTip("Exit Fullscreen (F)")
-        self.exit_fullscreen_button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self.exit_fullscreen_button.clicked.connect(self.parent.toggle_fullscreen)
-        self.exit_fullscreen_button.setEnabled(bool(self.parent.playlist))
-        control_layout.addWidget(self.exit_fullscreen_button)
-        main_layout.addLayout(control_layout)
-
-    def adjust_position(self):
-        screen = QApplication.primaryScreen().geometry()
-        dialog_size = self.sizeHint()
-        if dialog_size.width() == 0 or dialog_size.height() == 0:
-            dialog_size = QSize(600, 100)
-        x = (screen.width() - dialog_size.width()) // 2
-        y = screen.height() - dialog_size.height() - 20
-        self.setGeometry(x, y, dialog_size.width(), dialog_size.height())
-
-    def paintEvent(self, event):
-        painter = QPainter(self)
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        path = QPainterPath()
-        rect = self.rect()
-        radius = 12
-        path.addRoundedRect(QRectF(rect), radius, radius)
-        painter.setPen(Qt.PenStyle.NoPen)
-        painter.setBrush(QColor("#353535"))
-        painter.drawPath(path)
-        super().paintEvent(event)
-
-    def enterEvent(self, event):
-        self.hide_timer.stop()
-        super().enterEvent(event)
-
-    def mouseMoveEvent(self, event):
-        self.hide_timer.stop()
-        super().mouseMoveEvent(event)
-
-    def leaveEvent(self, event):
-        self.reset_hide_timer()
-        super().leaveEvent(event)
-
-    def reset_hide_timer(self):
-        if self.is_visible and not self.initial_show:
-            self.hide_timer.start(3000)
-
 class VideoWindow(QWidget):
     def __init__(self, parent):
         super().__init__()
@@ -1375,11 +1125,6 @@ class VideoWindow(QWidget):
         self.setWindowIcon(QIcon(resource_path("icons/tray_icon.png")))
         self.setMouseTracking(True)
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
-        self.hide_timer = QTimer(self)
-        self.hide_timer.setSingleShot(True)
-        self.hide_timer.timeout.connect(self.hide_control_dialog)
-        self.is_dialog_visible = False
-        self.initial_show = False
 
     def enter_fullscreen(self):
         self.hide()
@@ -1404,20 +1149,6 @@ class VideoWindow(QWidget):
         win32gui.SetWindowPos(video_hwnd, win32con.HWND_TOP, 
                              geom.x(), geom.y(), geom.width(), geom.height(), 
                              win32con.SWP_SHOWWINDOW | win32con.SWP_NOACTIVATE)
-
-    def start_hide_timer(self):
-        self.initial_show = False
-        self.reset_hide_timer()
-
-    def hide_control_dialog(self):
-        if self.is_dialog_visible:
-            self.is_dialog_visible = False
-            self.initial_show = False
-            self.parent.fullscreen_control_dialog.hide()
-
-    def reset_hide_timer(self):
-        if self.is_dialog_visible and not self.initial_show:
-            self.hide_timer.start(3000)
 
     def keyPressEvent(self, event):
         if self.parent.fullscreen_enabled:
@@ -1560,13 +1291,10 @@ class LDBPlayer(QMainWindow):
         self.event_manager.event_attach(vlc.EventType.MediaPlayerStopped, lambda event: self.handle_stop_event(event))
         self.event_manager.event_attach(vlc.EventType.MediaPlayerEncounteredError, lambda event: self.handle_error_event(event))
         self.event_manager.event_attach(vlc.EventType.MediaPlayerEndReached, lambda event: self.handle_end_reached_event(event))
-        if self.fullscreen_enabled:
-            self.fullscreen_control_dialog = FullscreenControlDialog(self)
-            self.fullscreen_control_dialog.hide()
-        self.autoplay_last_video()
         self.update_tray_actions()
         self.update_slider_state()
-        QTimer.singleShot(1500, self.play_welcome_video)
+        QTimer.singleShot(1500, self.autoplay_last_video)
+        QTimer.singleShot(2500, self.play_welcome_video)
         if '--autostart' not in sys.argv:
             QTimer.singleShot(50, self.bring_to_front)
 
@@ -1681,7 +1409,6 @@ class LDBPlayer(QMainWindow):
                     QTimer.singleShot(100, self.ensure_playing_and_set_audio)
                 self.video_window.show()
             event.acceptProposedAction()
-            self.update_control_dialog()
         else:
             event.ignore()
 
@@ -1888,16 +1615,6 @@ class LDBPlayer(QMainWindow):
         self.setMinimumSize(550, 250)
         QTimer.singleShot(0, self.adjustSize)
 
-    def update_fullscreen_button_state(self):
-        if not self.fullscreen_enabled:
-            return
-        state = self.player.get_state()
-        has_playlist = bool(self.playlist)
-        is_playable = has_playlist and state in (vlc.State.Playing, vlc.State.Paused)
-        self.fullscreen_button.setEnabled(is_playable)
-        if hasattr(self, 'fullscreen_control_dialog') and not sip.isdeleted(self.fullscreen_control_dialog):
-            self.fullscreen_control_dialog.exit_fullscreen_button.setEnabled(is_playable)
-
     def eventFilter(self, obj, event):
         if event.type() == QEvent.Type.MouseButtonPress:
             if obj in (self, self.central_frame):
@@ -2100,7 +1817,7 @@ class LDBPlayer(QMainWindow):
         target_index = self.get_valid_monitor_index()
         target_screen = screens[target_index] if target_index < len(screens) else QApplication.primaryScreen()
 
-        if is_fullscreen:
+        if is_fullscreen and self.fullscreen_enabled:
             self.video_window.enter_fullscreen()
         else:
             self.video_window.enter_desktop(target_screen)
@@ -2121,94 +1838,6 @@ class LDBPlayer(QMainWindow):
     def toggle_fullscreen(self):
         if not self.fullscreen_enabled:
             return
-        if hasattr(self, 'is_toggling') and self.is_toggling:
-            return
-        self.is_toggling = True
-        self.is_toggling_fullscreen = True
-        try:
-            state = self.player.get_state()
-            was_playing = state in (vlc.State.Playing, vlc.State.Paused)
-            was_paused = state == vlc.State.Paused
-            current_position = self.player.get_position() if was_playing and self.player.get_position() >= 0 else 0.0
-            self.last_known_position = current_position
-            current_index = self.current_video_index
-            video_name = os.path.basename(self.playlist[current_index]) if self.playlist and 0 <= current_index < len(self.playlist) else self.get_current_video_display_text()
-
-            self.player.set_hwnd(0)
-            self.video_window.hide()
-            self.is_fullscreen = not self.is_fullscreen
-            if self.is_fullscreen:
-                self.video_window.enter_fullscreen()
-            else:
-                self.video_window.enter_desktop()
-            self.player.set_hwnd(int(self.video_window.winId()))
-            self.video_window.show()
-            if was_playing:
-                self.list_player.play()
-                if was_paused:
-                    self.list_player.pause()
-                    self.is_paused = True
-                    self.play_pause_button.setIcon(QIcon(resource_path("icons/play_icon.png")))
-                    self.play_pause_button.setToolTip("Play (Space)")
-                else:
-                    self.is_paused = False
-                    self.play_pause_button.setIcon(QIcon(resource_path("icons/pause_icon.png")))
-                    self.play_pause_button.setToolTip("Pause (Space)")
-                QTimer.singleShot(100, self.ensure_playing_and_set_audio)
-                self.current_video_label.setText(self.truncate_label_text(video_name))
-            else:
-                self.play_pause_button.setIcon(QIcon(resource_path("icons/play_icon.png")))
-                self.play_pause_button.setToolTip("Play (Space)")
-                self.is_paused = False
-                self.current_video_label.setText(self.truncate_label_text(self.get_current_video_display_text()))
-            self.fullscreen_button.setIcon(QIcon(resource_path("icons/exit_fullscreen_icon.png" if self.is_fullscreen else "icons/fullscreen_icon.png")))
-            self.fullscreen_button.setToolTip("Exit Fullscreen (F)" if self.is_fullscreen else "Fullscreen (F)")
-            self._finalize_toggle()
-        finally:
-            self.is_toggling = False
-
-    def _finalize_toggle(self):
-        if self.is_fullscreen:
-            self.hide()
-            if hasattr(self, 'fullscreen_control_dialog') and not sip.isdeleted(self.fullscreen_control_dialog):
-                self.fullscreen_control_dialog.adjust_position()
-                QTimer.singleShot(300, self.fullscreen_control_dialog.show_dialog)
-                QTimer.singleShot(350, lambda: (self.video_window.activateWindow(), self.video_window.setFocus()))
-        else:
-            if hasattr(self, 'fullscreen_control_dialog') and not sip.isdeleted(self.fullscreen_control_dialog):
-                self.fullscreen_control_dialog.hide()
-            self.show()
-
-    def update_control_dialog(self):
-        if not self.fullscreen_enabled:
-            return
-        if hasattr(self, 'is_toggling_fullscreen') and self.is_toggling_fullscreen:
-            return
-        if hasattr(self, 'fullscreen_control_dialog') and not sip.isdeleted(self.fullscreen_control_dialog) and self.is_fullscreen:
-            try:
-                self.fullscreen_control_dialog.slider.setValue(int(self.player.get_position() * 1000))
-                self.fullscreen_control_dialog.play_pause_button.setIcon(
-                    QIcon(resource_path("icons/play_icon.png" if self.is_paused else "icons/pause_icon.png"))
-                )
-                self.fullscreen_control_dialog.play_pause_button.setToolTip(
-                    "Play (Space)" if self.is_paused else "Pause (Space)"
-                )
-                self.fullscreen_control_dialog.mute_button.setIcon(
-                    QIcon(resource_path("icons/mute_icon.png" if self.is_muted else "icons/unmute_icon.png"))
-                )
-                self.fullscreen_control_dialog.mute_button.setToolTip(
-                    "Unmute (M)" if self.is_muted else "Mute (M)"
-                )
-                self.fullscreen_control_dialog.volume_slider.setValue(self.volume_slider.value())
-                self.fullscreen_control_dialog.volume_label.setText(self.volume_label.text())
-                self.fullscreen_control_dialog.duration_label.setText(self.duration_label.text())
-                self.fullscreen_control_dialog.repeat_button.setIcon(
-                    QIcon(resource_path(f"icons/repeat_{self.repeat_mode}_icon.png"))
-                )
-                video_name = os.path.basename(self.playlist[self.current_video_index])
-                self.fullscreen_control_dialog.current_video_label.setText(self.truncate_label_text(video_name))
-            except Exception:
-                pass
 
     def load_config(self):
         os.makedirs(self.config_dir, exist_ok=True)
@@ -2362,13 +1991,13 @@ class LDBPlayer(QMainWindow):
             if not hasattr(self, 'video_window') or not self.video_window or sip.isdeleted(self.video_window):
                 self.setup_video_window(is_fullscreen=self.is_fullscreen)
             self.video_window.show()
-            QTimer.singleShot(1500, lambda: self.list_player.play_item_at_index(self.current_video_index))
+            self.list_player.play_item_at_index(self.current_video_index)
             self.play_pause_button.setIcon(QIcon(resource_path("icons/pause_icon.png")))
             self.play_pause_button.setToolTip("Pause (Space)")
             self.is_paused = False
             video_name = os.path.basename(self.playlist[self.current_video_index])
             self.current_video_label.setText(self.truncate_label_text(video_name))
-            QTimer.singleShot(1600, self.ensure_playing_and_set_audio)
+            QTimer.singleShot(100, self.ensure_playing_and_set_audio)
         else:
             if hasattr(self, 'video_window') and self.video_window:
                 self.video_window.hide()
@@ -2484,7 +2113,6 @@ class LDBPlayer(QMainWindow):
         else:
             self.current_video_index = min(self.current_video_index, len(self.playlist) - 1) if self.playlist else 0
             self.current_video_label.setText(self.truncate_label_text(self.get_current_video_display_text()))
-        self.update_fullscreen_button_state()
 
     def ensure_valid_current_video(self):
         if not self.playlist:
@@ -2508,11 +2136,9 @@ class LDBPlayer(QMainWindow):
             self.is_paused = True
         else:
             if not self.playlist or self.media_list.count() == 0:
-                self.update_fullscreen_button_state()
                 return
 
             if not self.ensure_valid_current_video():
-                self.update_fullscreen_button_state()
                 return
 
             if not hasattr(self, 'video_window') or not self.video_window or sip.isdeleted(self.video_window):
@@ -2537,8 +2163,6 @@ class LDBPlayer(QMainWindow):
                 self.current_video_label.setText(self.truncate_label_text(video_name))
                 QTimer.singleShot(100, self.ensure_playing_and_set_audio)
         self.save_config()
-        self.update_control_dialog()
-        self.update_fullscreen_button_state()
         self.update_tray_actions()
         self.update_slider_state()
 
@@ -2560,8 +2184,6 @@ class LDBPlayer(QMainWindow):
         if self.fullscreen_enabled and self.is_fullscreen:
             self.toggle_fullscreen()
         self.save_config()
-        self.update_control_dialog()
-        self.update_fullscreen_button_state()
         self.update_tray_actions()
         self.update_slider_state()
 
@@ -2578,7 +2200,6 @@ class LDBPlayer(QMainWindow):
             pass
         self.mute_button.setIcon(QIcon(resource_path("icons/mute_icon.png" if self.is_muted else "icons/unmute_icon.png")))
         self.mute_button.setToolTip("Unmute (M)" if self.is_muted else "Mute (M)")
-        self.update_control_dialog()
 
     def set_volume(self, value):
         self.volume_slider.setValue(value)
@@ -2591,7 +2212,6 @@ class LDBPlayer(QMainWindow):
                     self.player.audio_set_volume(0)
             except:
                 pass
-        self.update_control_dialog()
 
     def adjust_volume_by_wheel(self, delta):
         current_volume = self.volume_slider.value()
@@ -2635,7 +2255,6 @@ class LDBPlayer(QMainWindow):
         self.current_video_label.setText(self.truncate_label_text(video_name))
         QTimer.singleShot(100, self.ensure_playing_and_set_audio)
         self.save_config()
-        self.update_control_dialog()
 
     def play_previous(self):
         if not self.playlist or self.media_list.count() == 0:
@@ -2656,12 +2275,10 @@ class LDBPlayer(QMainWindow):
         self.current_video_label.setText(self.truncate_label_text(video_name))
         QTimer.singleShot(100, self.ensure_playing_and_set_audio)
         self.save_config()
-        self.update_control_dialog()
 
     def seek(self, position):
         pos = position / 1000.0
         self.player.set_position(pos)
-        self.update_control_dialog()
 
     def format_time(self, ms):
         if ms < 0:
@@ -2686,12 +2303,10 @@ class LDBPlayer(QMainWindow):
             self.duration_label.setText(f"{current_str} / {total_str}")
             if state == vlc.State.Paused:
                 self.last_known_position = self.player.get_position()
-            self.update_control_dialog()
         elif state == vlc.State.Stopped:
             self.slider.setValue(0)
             self.duration_label.setText("--:-- / --:--")
             self.last_known_position = 0.0
-            self.update_control_dialog()
 
     def handle_playing_event(self, event):
         if self.player.get_state() != vlc.State.Playing:
@@ -2708,7 +2323,8 @@ class LDBPlayer(QMainWindow):
                 self.current_video_index = 0
                 self.list_player.stop()
                 self.current_video_label.setText(self.truncate_label_text(self.get_current_video_display_text()))
-                self.video_window.hide()
+                if hasattr(self, 'video_window') and self.video_window and not sip.isdeleted(self.video_window):
+                    self.video_window.hide()
                 self.play_pause_button.setIcon(QIcon(resource_path("icons/play_icon.png")))
                 self.play_pause_button.setToolTip("Play (Space)")
                 self.is_paused = False
@@ -2735,7 +2351,6 @@ class LDBPlayer(QMainWindow):
             self.play_pause_button.setIcon(QIcon(resource_path("icons/pause_icon.png")))
             self.play_pause_button.setToolTip("Pause (Space)")
             self.is_paused = False
-            self.update_fullscreen_button_state()
 
     def handle_stop_event(self, event):
         if hasattr(self, 'video_window') and self.video_window and not sip.isdeleted(self.video_window):
