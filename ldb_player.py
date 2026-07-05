@@ -1047,34 +1047,27 @@ class PlaylistDialog(DialogBase):
                         else None)
         self.parent.playlist = self.temp_playlist.copy()
         self.parent.original_playlist = self.temp_playlist.copy()
+        if not self.temp_playlist:
+            self.parent.current_video_index = 0
+        elif current_video and current_video in self.temp_playlist:
+            self.parent.current_video_index = self.temp_playlist.index(current_video)
+        else:
+            self.parent.current_video_index = 0
+
         self.parent.save_config()
         self.parent.load_playlist()
 
         if not self.temp_playlist:
             self.parent.stop()
             self.parent.current_video_label.setText(self.parent.truncate_label_text("Playlist is empty"))
-        elif current_video and current_video in self.temp_playlist:
-            new_index = self.temp_playlist.index(current_video)
-            self.parent.current_video_index = new_index
-            if not hasattr(self.parent, 'video_window') or not self.parent.video_window or sip.isdeleted(self.parent.video_window):
-                self.parent.setup_video_window(is_fullscreen=self.parent.is_fullscreen)
-            self.parent.video_window.show()
-            self.parent.list_player.play_item_at_index(new_index)
-            self.parent.play_pause_button.setIcon(QIcon(resource_path("icons/pause_icon.png")))
-            self.parent.play_pause_button.setToolTip("Pause (Space)")
-            video_name = os.path.basename(self.temp_playlist[new_index])
-            self.parent.current_video_label.setText(self.parent.truncate_label_text(video_name))
-            if not self.parent.skip_audio_poll:
-                QTimer.singleShot(100, self.parent.ensure_playing_and_set_audio)
         else:
-            self.parent.current_video_index = 0
             if not hasattr(self.parent, 'video_window') or not self.parent.video_window or sip.isdeleted(self.parent.video_window):
                 self.parent.setup_video_window(is_fullscreen=self.parent.is_fullscreen)
             self.parent.video_window.show()
-            self.parent.list_player.play_item_at_index(0)
+            self.parent.list_player.play_item_at_index(self.parent.current_video_index)
             self.parent.play_pause_button.setIcon(QIcon(resource_path("icons/pause_icon.png")))
             self.parent.play_pause_button.setToolTip("Pause (Space)")
-            video_name = os.path.basename(self.temp_playlist[0]) if self.temp_playlist else "Playlist is empty"
+            video_name = os.path.basename(self.temp_playlist[self.parent.current_video_index])
             self.parent.current_video_label.setText(self.parent.truncate_label_text(video_name))
             if not self.parent.skip_audio_poll:
                 QTimer.singleShot(100, self.parent.ensure_playing_and_set_audio)
@@ -1293,8 +1286,8 @@ class LDBPlayer(QMainWindow):
         self.event_manager.event_attach(vlc.EventType.MediaPlayerEndReached, lambda event: self.handle_end_reached_event(event))
         self.update_tray_actions()
         self.update_slider_state()
-        QTimer.singleShot(1500, self.autoplay_last_video)
-        QTimer.singleShot(2500, self.play_welcome_video)
+        QTimer.singleShot(2500, self.autoplay_last_video)
+        QTimer.singleShot(3500, self.play_welcome_video)
         if '--autostart' not in sys.argv:
             QTimer.singleShot(50, self.bring_to_front)
 
@@ -2200,6 +2193,7 @@ class LDBPlayer(QMainWindow):
             pass
         self.mute_button.setIcon(QIcon(resource_path("icons/mute_icon.png" if self.is_muted else "icons/unmute_icon.png")))
         self.mute_button.setToolTip("Unmute (M)" if self.is_muted else "Mute (M)")
+        self.save_config()
 
     def set_volume(self, value):
         self.volume_slider.setValue(value)
@@ -2311,6 +2305,7 @@ class LDBPlayer(QMainWindow):
     def handle_playing_event(self, event):
         if self.player.get_state() != vlc.State.Playing:
             return
+        old_index = self.current_video_index
         current_media = self.player.get_media()
         if current_media and self.media_list.count() > 0:
             media_path = urllib.parse.unquote(current_media.get_mrl().replace('file:///', ''))
@@ -2342,6 +2337,9 @@ class LDBPlayer(QMainWindow):
         QApplication.postEvent(self, CustomEvent(video_name, self.current_video_index))
         self.update_tray_actions()
         self.update_slider_state()
+
+        if self.current_video_index != old_index:
+            self.save_config()
 
     def update_ui(self, video_name, index):
         if self.player.get_state() == vlc.State.Playing:

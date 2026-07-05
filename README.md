@@ -65,8 +65,8 @@ Join the community:
 
 ## Version Changes
 - v1.0.8
-    - Improved performance and stability
-    - Optimized code
+    - Optimized code for improved performance and stability
+    - Updated playback indexing
 - v1.0.6
     - Updated system tray menu
     - Fixed critical playback issue
