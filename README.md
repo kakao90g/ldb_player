@@ -7,10 +7,10 @@ LDB Player is a Windows-specific media player that transforms your desktop into 
 ## Features
 - Play videos as live desktop backgrounds.
 - **Multi-display support** — choose which monitor to use in Settings.
-- Playlist management: Add, remove, shuffle, save, and load playlists (with drag-and-drop support).
+- Playlist management: Add, remove, shuffle, save, and load playlists.
 - Global hotkeys for playback control, volume adjustment, seeking, and navigation.
 - Repeat modes (single video or entire playlist).
-- Auto start feature on system restart adjustable in Settings.
+- Auto play feature on system restart adjustable in Settings.
 - Dark-themed, modern user interface.
 - Built-in update checker with updater download support.
 
