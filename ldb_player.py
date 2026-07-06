@@ -14,7 +14,7 @@ from PyQt6.QtWidgets import (
     QComboBox
 )
 from PyQt6.QtCore import Qt, QTimer, QEvent, QPoint, QSize, QRectF
-from PyQt6.QtGui import QIcon, QAction, QPainter, QPainterPath, QColor
+from PyQt6.QtGui import QIcon, QAction
 import pathlib
 import random
 import urllib.parse
@@ -1024,7 +1024,7 @@ class PlaylistDialog(DialogBase):
         selected = self.playlist_widget.currentRow()
         self.parent.playlist = self.temp_playlist.copy()
         self.parent.original_playlist = self.temp_playlist.copy()
-        self.parent.save_config()
+        QTimer.singleShot(100, self.parent.save_config_when_playing)
         self.parent.load_playlist()
         self.parent.current_video_index = selected
         if not hasattr(self.parent, 'video_window') or not self.parent.video_window or sip.isdeleted(self.parent.video_window):
@@ -1054,7 +1054,7 @@ class PlaylistDialog(DialogBase):
         else:
             self.parent.current_video_index = 0
 
-        self.parent.save_config()
+        QTimer.singleShot(100, self.parent.save_config_when_playing)
         self.parent.load_playlist()
 
         if not self.temp_playlist:
@@ -1286,15 +1286,14 @@ class LDBPlayer(QMainWindow):
         self.event_manager.event_attach(vlc.EventType.MediaPlayerEndReached, lambda event: self.handle_end_reached_event(event))
         self.update_tray_actions()
         self.update_slider_state()
-        QTimer.singleShot(2500, self.autoplay_last_video)
-        QTimer.singleShot(3500, self.play_welcome_video)
+        QTimer.singleShot(1000, self.autoplay_last_video)
+        QTimer.singleShot(2000, self.play_welcome_video)
         if '--autostart' not in sys.argv:
             QTimer.singleShot(50, self.bring_to_front)
 
     def bring_to_front(self):
         self.show()
         self.raise_()
-        self.activateWindow()
         self.setFocus()
 
     def truncate_label_text(self, text):
@@ -1364,7 +1363,6 @@ class LDBPlayer(QMainWindow):
                     files.append(file_path)
         if files:
             self.last_video_dir = os.path.dirname(files[0])
-            self.save_config()
             state = self.player.get_state()
             was_playing = state in (vlc.State.Playing, vlc.State.Paused)
             was_paused = state == vlc.State.Paused
@@ -1372,7 +1370,12 @@ class LDBPlayer(QMainWindow):
             new_files = [f for f in files if not self.is_duplicate_file(f, self.playlist)]
             self.playlist.extend(new_files)
             self.original_playlist.extend(new_files)
-            self.save_config()
+
+            if was_playing:
+                QTimer.singleShot(100, self.save_config_when_playing)
+            else:
+                self.save_config()
+
             self.load_playlist()
             if was_empty:
                 self.current_video_index = 0
@@ -1400,7 +1403,6 @@ class LDBPlayer(QMainWindow):
                     video_name = os.path.basename(self.playlist[self.current_video_index])
                     self.current_video_label.setText(self.truncate_label_text(video_name))
                     QTimer.singleShot(100, self.ensure_playing_and_set_audio)
-                self.video_window.show()
             event.acceptProposedAction()
         else:
             event.ignore()
@@ -1923,12 +1925,18 @@ class LDBPlayer(QMainWindow):
                 window_rect.moveTop(screen.top())
             self.setGeometry(window_rect)
 
+    def save_config_when_playing(self):
+        if self.player.get_state() in (vlc.State.Playing, vlc.State.Paused):
+            self.save_config()
+        else:
+            QTimer.singleShot(100, self.save_config_when_playing)
+
     def ensure_playing_and_set_audio(self):
         if self.player.get_state() in (vlc.State.Playing, vlc.State.Paused):
             self.set_volume(self.volume_slider.value())
             self.player.audio_set_mute(self.is_muted)
         else:
-            QTimer.singleShot(50, self.ensure_playing_and_set_audio)
+            QTimer.singleShot(100, self.ensure_playing_and_set_audio)
 
     def play_welcome_video(self):
         welcome_shown = False
@@ -2115,7 +2123,7 @@ class LDBPlayer(QMainWindow):
             self.playlist = [p for p in self.playlist if os.path.exists(p)]
             self.original_playlist = self.playlist.copy()
             self.current_video_index = min(self.current_video_index, len(self.playlist) - 1) if self.playlist else 0
-            self.save_config()
+            QTimer.singleShot(100, self.save_config_when_playing)
             self.load_playlist()
             return bool(self.playlist)
 
@@ -2155,7 +2163,7 @@ class LDBPlayer(QMainWindow):
                 video_name = os.path.basename(self.playlist[self.current_video_index])
                 self.current_video_label.setText(self.truncate_label_text(video_name))
                 QTimer.singleShot(100, self.ensure_playing_and_set_audio)
-        self.save_config()
+        QTimer.singleShot(100, self.save_config_when_playing)
         self.update_tray_actions()
         self.update_slider_state()
 
@@ -2248,7 +2256,7 @@ class LDBPlayer(QMainWindow):
         video_name = os.path.basename(self.playlist[self.current_video_index])
         self.current_video_label.setText(self.truncate_label_text(video_name))
         QTimer.singleShot(100, self.ensure_playing_and_set_audio)
-        self.save_config()
+        QTimer.singleShot(100, self.save_config_when_playing)
 
     def play_previous(self):
         if not self.playlist or self.media_list.count() == 0:
@@ -2268,7 +2276,7 @@ class LDBPlayer(QMainWindow):
         video_name = os.path.basename(self.playlist[self.current_video_index])
         self.current_video_label.setText(self.truncate_label_text(video_name))
         QTimer.singleShot(100, self.ensure_playing_and_set_audio)
-        self.save_config()
+        QTimer.singleShot(100, self.save_config_when_playing)
 
     def seek(self, position):
         pos = position / 1000.0
@@ -2339,7 +2347,7 @@ class LDBPlayer(QMainWindow):
         self.update_slider_state()
 
         if self.current_video_index != old_index:
-            self.save_config()
+            QTimer.singleShot(100, self.save_config_when_playing)
 
     def update_ui(self, video_name, index):
         if self.player.get_state() == vlc.State.Playing:

@@ -67,6 +67,7 @@ Join the community:
 - v1.0.8
     - Optimized code for improved performance and stability
     - Updated playback indexing
+    - Fixed autoplay startup issue
 - v1.0.6
     - Updated system tray menu
     - Fixed critical playback issue
