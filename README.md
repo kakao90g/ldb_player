@@ -4,9 +4,14 @@ LDB Player is a Windows-specific media player that transforms your desktop into 
 
 ![LDB Player Main UI](screenshots/main-ui.png)
 
+## Download now available in Microsoft Store
+- Download link: https://apps.microsoft.com/detail/9PP860QK40K2?hl=en-us&gl=US&ocid=pdpshare
+- Currently supported regions as of 07/07/2026.
+    - English (United States)
+
 ## Features
 - Play videos as live desktop backgrounds.
-- **Multi-display support** — choose which monitor to use in Settings.
+- Multi-display support — choose which monitor to use in Settings.
 - Playlist management: Add, remove, shuffle, save, and load playlists.
 - Global hotkeys for playback control, volume adjustment, seeking, and navigation.
 - Repeat modes (single video or entire playlist).
@@ -20,7 +25,7 @@ LDB Player is a Windows-specific media player that transforms your desktop into 
 - Python 3.10+ (required only for running from source).
 
 ## Downloads (For End Users)
-- For a ready-to-use version without needing Python or dependencies, download the latest standalone executable (.exe) from the [Releases page](https://github.com/kakao90g/ldb_player/releases). Simply run the .exe to start the player—no installation required.
+- For a ready-to-use version without needing Python or dependencies, download the latest standalone executable (.exe) from the [Releases](https://github.com/kakao90g/ldb_player/releases) page. Simply run the .exe to start the player — no installation required.
 
 ## Installation from Source (For Developers)
 1. Clone or download this repository.
