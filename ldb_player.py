@@ -30,7 +30,7 @@ def resource_path(relative_path):
 
 logging.basicConfig(level=logging.CRITICAL)
 
-VERSION = "1.0.8"
+VERSION = "1.0.9"
 
 QSS_STYLE = """
 QMainWindow, QDialog {
@@ -1223,18 +1223,29 @@ class CustomTrayMenu(QMenu):
 
     def showEvent(self, event):
         super().showEvent(event)
-        tray_geo = self.parent().tray_icon.geometry()
-        menu_size = self.sizeHint()
-        screen = QApplication.primaryScreen().availableGeometry()
+        try:
+            QTimer.singleShot(0, self._position_menu)
+        except Exception:
+            pass
 
-        x = tray_geo.center().x() - menu_size.width() // 2
-        y = tray_geo.top() - menu_size.height() - 10
+    def _position_menu(self):
+        try:
+            tray_geo = self.parent().tray_icon.geometry()
+            self.adjustSize()
+            menu_size = self.sizeHint()
+            screen = QApplication.primaryScreen().availableGeometry()
 
-        if y < screen.top():
-            y = tray_geo.bottom() + 8
-        x = max(screen.left() + 10, min(x, screen.right() - menu_size.width() - 10))
+            x = tray_geo.center().x() - menu_size.width() // 2
+            y = tray_geo.top() - menu_size.height() - 10
 
-        self.move(x, y)
+            if y < screen.top() + 10:
+                y = tray_geo.bottom() + 10
+
+            x = max(screen.left() + 10, min(x, screen.right() - menu_size.width() - 10))
+
+            self.move(x, y)
+        except Exception:
+            pass
 
 class LDBPlayer(QMainWindow):
     def __init__(self):
@@ -1753,11 +1764,13 @@ class LDBPlayer(QMainWindow):
     def get_available_monitors(self):
         try:
             screens = QApplication.screens()
+            if not screens:
+                return ["Primary Monitor"]
             monitors = []
             for i, screen in enumerate(screens):
-                manufacturer = screen.manufacturer().strip()
-                model = screen.model().strip()
-                name = screen.name().strip()
+                manufacturer = screen.manufacturer().strip() if hasattr(screen, 'manufacturer') else ""
+                model = screen.model().strip() if hasattr(screen, 'model') else ""
+                name = screen.name().strip() if hasattr(screen, 'name') else ""
 
                 if manufacturer and model:
                     display_name = f"{manufacturer} {model}"
@@ -1776,8 +1789,7 @@ class LDBPlayer(QMainWindow):
 
                 monitors.append(display_name)
             return monitors
-        except Exception as e:
-            logging.error(f"Monitor detection failed: {e}")
+        except Exception:
             return ["Primary Monitor"]
 
     def get_valid_monitor_index(self):

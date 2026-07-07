@@ -4,7 +4,7 @@ LDB Player is a Windows-specific media player that transforms your desktop into 
 
 ![LDB Player Main UI](screenshots/main-ui.png)
 
-## Download now available in Microsoft Store
+## Now available in Microsoft Store
 - Download link: https://apps.microsoft.com/detail/9PP860QK40K2?hl=en-us&gl=US&ocid=pdpshare
 - Currently supported regions as of 07/07/2026.
     - English (United States)
@@ -69,6 +69,8 @@ Join the community:
 - Discord: https://discord.gg/TAfUNGHYR3
 
 ## Version Changes
+- v1.0.9
+    - Added safety checks to prevent random crashes
 - v1.0.8
     - Optimized code for improved performance and stability
     - Updated playback indexing
