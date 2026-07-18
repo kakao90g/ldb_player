@@ -28,23 +28,33 @@ def resource_path(relative_path):
         base_path = os.path.abspath(".")
     return os.path.join(base_path, relative_path)
 
+def get_exe_dir():
+    if getattr(sys, 'frozen', False):
+        return os.path.dirname(sys.executable)
+    else:
+        return os.path.abspath(".")
+
+def welcome_resource_path():
+    base_dir = get_exe_dir()
+    return os.path.join(base_dir, "sample", "welcome.mp4")
+
 logging.basicConfig(level=logging.CRITICAL)
 
-VERSION = "1.0.9"
+VERSION = "1.1.0"
 
 QSS_STYLE = """
 QMainWindow, QDialog {
-    background-color: #353535;
+    background-color: #2a2a2a;
 }
 QFrame#centralFrame, QWidget#dialogFrame {
-    background-color: #353535;
+    background-color: #2a2a2a;
 }
 QWidget#titleBar {
     background-color: transparent;
 }
 QPushButton {
-    background-color: #353535;
-    border: none;
+    background-color: #2a2a2a;
+    border: 1px solid #666666;
     border-radius: 16px;
     color: white;
 }
@@ -54,6 +64,7 @@ QPushButton#settingsButton, QPushButton#aboutButton {
     width: 48px;
     height: 48px;
     border-radius: 24px;
+    border: 1px solid #777777;
 }
 QPushButton#okButton, QPushButton#cancelButton, QPushButton#addButton, QPushButton#removeButton,
 QPushButton#moveUpButton, QPushButton#moveDownButton, QPushButton#shuffleButton, QPushButton#clearButton,
@@ -64,17 +75,18 @@ QPushButton#deleteButton, QPushButton#playSelectedButton, QPushButton#hotkeysBut
     border-radius: 16px;
 }
 QPushButton:hover {
-    background-color: #252525;
-    border: none;
+    background-color: #1f1f1f;
+    border: 1px solid #999999;
 }
 QPushButton#minimizeButton, QPushButton#closeButton, QPushButton#dialogCloseButton {
     background-color: transparent;
     width: 24px;
     height: 24px;
     border-radius: 12px;
+    border: none;
 }
 QPushButton#minimizeButton:hover, QPushButton#closeButton:hover, QPushButton#dialogCloseButton:hover {
-    background-color: #252525;
+    background-color: #1f1f1f;
     border: none;
 }
 QSlider::groove:horizontal {
@@ -113,15 +125,15 @@ QLabel {
     color: white;
 }
 QCheckBox {
-    background-color: #353535;
+    background-color: #2a2a2a;
     color: white;
 }
 QListWidget, QInputDialog, QLineEdit {
-    background-color: #252525;
+    background-color: #1f1f1f;
     color: white;
 }
 QToolTip {
-    background-color: #353535;
+    background-color: #2a2a2a;
     color: white;
     border: 1px solid white;
     padding: 2px;
@@ -131,11 +143,11 @@ QLabel#supportLabel a, QLabel#supportLabel a:link, QLabel#supportLabel a:visited
     text-decoration: none;
 }
 QTableWidget {
-    background-color: #252525;
+    background-color: #1f1f1f;
     color: white;
 }
 QTableWidget::item {
-    background-color: #252525;
+    background-color: #1f1f1f;
     color: white;
 }
 """
@@ -147,7 +159,7 @@ QPushButton#fullscreenButton {
     border-radius: 24px;
 }
 QPushButton#fullscreenButton:hover {
-    background-color: #252525;
+    background-color: #1f1f1f;
     border: none;
 }
 QPushButton#exitFullscreenButton {
@@ -157,7 +169,7 @@ QPushButton#exitFullscreenButton {
     border-radius: 24px;
 }
 QPushButton#exitFullscreenButton:hover {
-    background-color: #252525;
+    background-color: #1f1f1f;
     border: none;
 }
 """
@@ -1036,6 +1048,8 @@ class PlaylistDialog(DialogBase):
         video_name = os.path.basename(self.temp_playlist[selected])
         self.parent.current_video_label.setText(self.parent.truncate_label_text(video_name))
         QTimer.singleShot(100, self.parent.ensure_playing_and_set_audio)
+        QTimer.singleShot(100, self.parent.update_tray_actions)
+        QTimer.singleShot(100, self.parent.update_slider_state)
         self.parent.skip_audio_poll = True
         self.accept()
 
@@ -1071,6 +1085,8 @@ class PlaylistDialog(DialogBase):
             self.parent.current_video_label.setText(self.parent.truncate_label_text(video_name))
             if not self.parent.skip_audio_poll:
                 QTimer.singleShot(100, self.parent.ensure_playing_and_set_audio)
+                QTimer.singleShot(100, self.parent.update_tray_actions)
+                QTimer.singleShot(100, self.parent.update_slider_state)
         self.parent.skip_audio_poll = False
         super().accept()
 
@@ -1197,7 +1213,7 @@ class CustomTrayMenu(QMenu):
         super().__init__(parent)
         self.setStyleSheet("""
             QMenu {
-                background-color: #353535;
+                background-color: #2a2a2a;
                 color: white;
                 border: 1px solid #555555;
                 border-radius: 8px;
@@ -1208,11 +1224,11 @@ class CustomTrayMenu(QMenu):
                 border-radius: 4px;
             }
             QMenu::item:selected {
-                background-color: #252525;
+                background-color: #1f1f1f;
             }
             QMenu::item:disabled {
                 color: #666666;
-                background-color: #353535;
+                background-color: #2a2a2a;
             }
             QMenu::separator {
                 height: 1px;
@@ -1220,6 +1236,12 @@ class CustomTrayMenu(QMenu):
                 margin: 4px 0;
             }
         """)
+
+    def mouseReleaseEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            super().mouseReleaseEvent(event)
+        else:
+            event.ignore()
 
     def showEvent(self, event):
         super().showEvent(event)
@@ -1284,6 +1306,7 @@ class LDBPlayer(QMainWindow):
         self.last_known_position = 0.0
         self.is_toggling_fullscreen = False
         self.just_toggled_fullscreen = False
+        self.welcome_video_playing = False
         self.init_ui()
         self.installEventFilter(self)
         self.central_frame.installEventFilter(self)
@@ -1297,8 +1320,9 @@ class LDBPlayer(QMainWindow):
         self.event_manager.event_attach(vlc.EventType.MediaPlayerEndReached, lambda event: self.handle_end_reached_event(event))
         self.update_tray_actions()
         self.update_slider_state()
-        QTimer.singleShot(1000, self.autoplay_last_video)
-        QTimer.singleShot(2000, self.play_welcome_video)
+        QTimer.singleShot(800, self.play_welcome_video)
+        QTimer.singleShot(1500, self.autoplay_last_video)
+
         if '--autostart' not in sys.argv:
             QTimer.singleShot(50, self.bring_to_front)
 
@@ -1400,6 +1424,8 @@ class LDBPlayer(QMainWindow):
                 video_name = os.path.basename(self.playlist[self.current_video_index])
                 self.current_video_label.setText(self.truncate_label_text(video_name))
                 QTimer.singleShot(100, self.ensure_playing_and_set_audio)
+                QTimer.singleShot(100, self.update_tray_actions)
+                QTimer.singleShot(100, self.update_slider_state)
             elif was_playing:
                 if was_paused:
                     self.play_pause_button.setIcon(QIcon(resource_path("icons/play_icon.png")))
@@ -1414,6 +1440,8 @@ class LDBPlayer(QMainWindow):
                     video_name = os.path.basename(self.playlist[self.current_video_index])
                     self.current_video_label.setText(self.truncate_label_text(video_name))
                     QTimer.singleShot(100, self.ensure_playing_and_set_audio)
+                    QTimer.singleShot(100, self.update_tray_actions)
+                    QTimer.singleShot(100, self.update_slider_state)
             event.acceptProposedAction()
         else:
             event.ignore()
@@ -1425,12 +1453,12 @@ class LDBPlayer(QMainWindow):
         self.central_frame = central_frame
         self.setCentralWidget(central_frame)
         main_layout = QVBoxLayout(central_frame)
-        main_layout.setContentsMargins(20, 10, 20, 0)
+        main_layout.setContentsMargins(20, 10, 20, 10)
         main_layout.setSpacing(10)
         video_layout = QHBoxLayout()
         video_layout.setSpacing(10)
         self.current_video_label = QLabel(self.get_current_video_display_text())
-        self.current_video_label.setFixedWidth(480)
+        self.current_video_label.setFixedWidth(510)
         self.current_video_label.setMinimumHeight(32)
         video_layout.addWidget(self.current_video_label)
         main_layout.addLayout(video_layout)
@@ -1489,6 +1517,7 @@ class LDBPlayer(QMainWindow):
         self.slider.sliderMoved.connect(self.seek)
         self.slider.setEnabled(False)
         main_layout.addWidget(self.slider)
+        main_layout.addSpacing(10)
         control_layout = QHBoxLayout()
         control_layout.setSpacing(10)
         self.playlist_button = QPushButton()
@@ -1534,10 +1563,14 @@ class LDBPlayer(QMainWindow):
         self.repeat_button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.repeat_button.clicked.connect(lambda: self.toggle_repeat(None))
         control_layout.addWidget(self.playlist_button)
-        control_layout.addWidget(self.play_pause_button)
-        control_layout.addWidget(self.stop_button)
+        control_layout.addStretch()
+        control_layout.addSpacing(20)
         control_layout.addWidget(self.prev_button)
+        control_layout.addWidget(self.play_pause_button)
         control_layout.addWidget(self.next_button)
+        control_layout.addSpacing(20)
+        control_layout.addStretch()
+        control_layout.addWidget(self.stop_button)
         control_layout.addWidget(self.repeat_button)
         main_layout.addLayout(control_layout)
         volume_layout = QHBoxLayout()
@@ -1554,7 +1587,7 @@ class LDBPlayer(QMainWindow):
         self.volume_slider.setMinimum(0)
         self.volume_slider.setMaximum(200)
         self.volume_slider.setValue(100)
-        self.volume_slider.setFixedWidth(150)
+        self.volume_slider.setFixedWidth(100)
         self.volume_slider.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.volume_slider.valueChanged.connect(self.set_volume)
 
@@ -1581,6 +1614,7 @@ class LDBPlayer(QMainWindow):
 
         self.volume_label = QLabel("100%")
         self.volume_label.setObjectName("volumeLabel")
+        self.volume_label.setFixedWidth(40)
         self.duration_label = QLabel("--:-- / --:--")
         self.duration_label.setObjectName("durationLabel")
         self.fullscreen_button = QPushButton()
@@ -1609,9 +1643,11 @@ class LDBPlayer(QMainWindow):
         volume_layout.addWidget(self.mute_button)
         volume_layout.addWidget(self.volume_slider)
         volume_layout.addWidget(self.volume_label)
+        volume_layout.addStretch()
         volume_layout.addSpacing(20)
         volume_layout.addWidget(self.duration_label)
         volume_layout.addSpacing(20)
+        volume_layout.addStretch()
         if self.fullscreen_enabled:
             volume_layout.addWidget(self.fullscreen_button)
         volume_layout.addWidget(settings_button)
@@ -1963,7 +1999,25 @@ class LDBPlayer(QMainWindow):
         if welcome_shown:
             return
 
+        welcome_path = welcome_resource_path()
+
+        if not os.path.exists(welcome_path):
+            try:
+                os.makedirs(self.config_dir, exist_ok=True)
+                config = {}
+                if os.path.exists(self.config_file):
+                    with open(self.config_file, 'r', encoding='utf-8') as f:
+                        config = json.load(f)
+                config['welcome_shown'] = True
+                with open(self.config_file, 'w', encoding='utf-8') as f:
+                    json.dump(config, f, indent=2)
+            except:
+                pass
+            return
+
         try:
+            self.welcome_video_playing = True
+
             os.makedirs(self.config_dir, exist_ok=True)
             config = {}
             if os.path.exists(self.config_file):
@@ -1972,14 +2026,7 @@ class LDBPlayer(QMainWindow):
             config['welcome_shown'] = True
             with open(self.config_file, 'w', encoding='utf-8') as f:
                 json.dump(config, f, indent=2)
-        except:
-            pass
 
-        welcome_path = resource_path("sample/welcome.mp4")
-        if not os.path.exists(welcome_path):
-            return
-
-        try:
             if not hasattr(self, 'video_window') or not self.video_window or sip.isdeleted(self.video_window):
                 self.setup_video_window(is_fullscreen=self.is_fullscreen)
 
@@ -1992,10 +2039,23 @@ class LDBPlayer(QMainWindow):
             self.load_playlist()
             self.list_player.play_item_at_index(0)
 
+            self.play_pause_button.setIcon(QIcon(resource_path("icons/pause_icon.png")))
+            self.play_pause_button.setToolTip("Pause (Space)")
+            self.is_paused = False
+            video_name = os.path.basename(self.playlist[self.current_video_index])
+            self.current_video_label.setText(self.truncate_label_text(video_name))
+
+            QTimer.singleShot(100, self.ensure_playing_and_set_audio)
+            QTimer.singleShot(100, self.update_tray_actions)
+            QTimer.singleShot(100, self.update_slider_state)
+
         except Exception:
-            pass
+            self.welcome_video_playing = False
 
     def autoplay_last_video(self):
+        if getattr(self, 'welcome_video_playing', False):
+            return
+
         if (self.playback_state in ['playing', 'paused'] and self.repeat_mode in ['one', 'all'] and
             self.playlist and 0 <= self.current_video_index < len(self.playlist) and
             os.path.exists(self.playlist[self.current_video_index])):
@@ -2011,11 +2071,10 @@ class LDBPlayer(QMainWindow):
             video_name = os.path.basename(self.playlist[self.current_video_index])
             self.current_video_label.setText(self.truncate_label_text(video_name))
             QTimer.singleShot(100, self.ensure_playing_and_set_audio)
+            QTimer.singleShot(100, self.update_tray_actions)
+            QTimer.singleShot(100, self.update_slider_state)
         else:
-            if hasattr(self, 'video_window') and self.video_window:
-                self.video_window.hide()
-            self.update_tray_actions()
-            self.update_slider_state()
+            self.stop()
 
     def open_settings(self):
         try:
@@ -2176,8 +2235,8 @@ class LDBPlayer(QMainWindow):
                 self.current_video_label.setText(self.truncate_label_text(video_name))
                 QTimer.singleShot(100, self.ensure_playing_and_set_audio)
         QTimer.singleShot(100, self.save_config_when_playing)
-        self.update_tray_actions()
-        self.update_slider_state()
+        QTimer.singleShot(100, self.update_tray_actions)
+        QTimer.singleShot(100, self.update_slider_state)
 
     def stop(self):
         self.list_player.stop()
@@ -2246,7 +2305,7 @@ class LDBPlayer(QMainWindow):
         else:
             self.repeat_mode = mode
         self.repeat_button.setIcon(QIcon(resource_path(f"icons/repeat_{self.repeat_mode}_icon.png")))
-        self.repeat_button.setToolTip("Loop")
+        self.repeat_button.setToolTip("Loop (L)")
         self.list_player.set_playback_mode(vlc.PlaybackMode.repeat if self.repeat_mode == 'one' else vlc.PlaybackMode.loop)
         self.save_config()
 
@@ -2269,6 +2328,8 @@ class LDBPlayer(QMainWindow):
         self.current_video_label.setText(self.truncate_label_text(video_name))
         QTimer.singleShot(100, self.ensure_playing_and_set_audio)
         QTimer.singleShot(100, self.save_config_when_playing)
+        QTimer.singleShot(100, self.update_tray_actions)
+        QTimer.singleShot(100, self.update_slider_state)
 
     def play_previous(self):
         if not self.playlist or self.media_list.count() == 0:
@@ -2289,6 +2350,8 @@ class LDBPlayer(QMainWindow):
         self.current_video_label.setText(self.truncate_label_text(video_name))
         QTimer.singleShot(100, self.ensure_playing_and_set_audio)
         QTimer.singleShot(100, self.save_config_when_playing)
+        QTimer.singleShot(100, self.update_tray_actions)
+        QTimer.singleShot(100, self.update_slider_state)
 
     def seek(self, position):
         pos = position / 1000.0
@@ -2355,8 +2418,6 @@ class LDBPlayer(QMainWindow):
             self.current_video_index = 0
         self.current_video_label.setText(self.truncate_label_text(video_name))
         QApplication.postEvent(self, CustomEvent(video_name, self.current_video_index))
-        self.update_tray_actions()
-        self.update_slider_state()
 
         if self.current_video_index != old_index:
             QTimer.singleShot(100, self.save_config_when_playing)
@@ -2375,8 +2436,6 @@ class LDBPlayer(QMainWindow):
             self.video_window.hide()
         self.current_video_label.setText(self.truncate_label_text(self.get_current_video_display_text()))
         self.duration_label.setText("--:-- / --:--")
-        self.update_tray_actions()
-        self.update_slider_state()
 
     def handle_error_event(self, event):
         dialog = MessageDialog(self, "Playback Error", "An error occurred during playback.")

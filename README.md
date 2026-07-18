@@ -69,6 +69,9 @@ Join the community:
 - Discord: https://discord.gg/TAfUNGHYR3
 
 ## Version Changes
+- v1.1.0
+    - A new updated UI
+    - Various improvements and bug fixes
 - v1.0.9
     - Added safety checks to prevent random crashes
 - v1.0.8

@@ -24,17 +24,17 @@ def resource_path(relative_path):
 
 QSS_STYLE = """
 QMainWindow, QDialog {
-    background-color: #353535;
+    background-color: #2a2a2a;
 }
 QFrame#centralFrame, QWidget#dialogFrame {
-    background-color: #353535;
+    background-color: #2a2a2a;
 }
 QWidget#titleBar {
     background-color: transparent;
 }
 QPushButton {
-    background-color: #353535;
-    border: none;
+    background-color: #2a2a2a;
+    border: 1px solid #666666;
     border-radius: 16px;
     color: white;
 }
@@ -44,14 +44,14 @@ QPushButton#okButton, QPushButton#cancelButton {
     border-radius: 16px;
 }
 QPushButton:hover {
-    background-color: #252525;
-    border: none;
+    background-color: #1f1f1f;
+    border: 1px solid #999999;
 }
 QLabel {
     color: white;
 }
 QToolTip {
-    background-color: #353535;
+    background-color: #2a2a2a;
     color: white;
     border: 1px solid white;
     padding: 2px;
