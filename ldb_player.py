@@ -40,7 +40,7 @@ def welcome_resource_path():
 
 logging.basicConfig(level=logging.CRITICAL)
 
-VERSION = "1.1.0"
+VERSION = "1.1.2"
 
 QSS_STYLE = """
 QMainWindow, QDialog {
@@ -1047,9 +1047,13 @@ class PlaylistDialog(DialogBase):
         self.parent.play_pause_button.setToolTip("Pause (Space)")
         video_name = os.path.basename(self.temp_playlist[selected])
         self.parent.current_video_label.setText(self.parent.truncate_label_text(video_name))
+        self.parent.is_currently_playing = True
+        self.parent.is_paused = False
+        self.parent.update_tray_actions()
+        self.parent.slider_enabled = True
+        self.parent.update_slider_state()
+        self.parent.stop_by_user = False
         QTimer.singleShot(100, self.parent.ensure_playing_and_set_audio)
-        QTimer.singleShot(100, self.parent.update_tray_actions)
-        QTimer.singleShot(100, self.parent.update_slider_state)
         self.parent.skip_audio_poll = True
         self.accept()
 
@@ -1074,6 +1078,11 @@ class PlaylistDialog(DialogBase):
         if not self.temp_playlist:
             self.parent.stop()
             self.parent.current_video_label.setText(self.parent.truncate_label_text("Playlist is empty"))
+            self.parent.is_currently_playing = False
+            self.parent.is_paused = False
+            self.parent.update_tray_actions()
+            self.parent.slider_enabled = False
+            self.parent.update_slider_state()
         else:
             if not hasattr(self.parent, 'video_window') or not self.parent.video_window or sip.isdeleted(self.parent.video_window):
                 self.parent.setup_video_window(is_fullscreen=self.parent.is_fullscreen)
@@ -1084,9 +1093,13 @@ class PlaylistDialog(DialogBase):
             video_name = os.path.basename(self.temp_playlist[self.parent.current_video_index])
             self.parent.current_video_label.setText(self.parent.truncate_label_text(video_name))
             if not self.parent.skip_audio_poll:
+                self.parent.is_currently_playing = True
+                self.parent.is_paused = False
+                self.parent.update_tray_actions()
+                self.parent.slider_enabled = True
+                self.parent.update_slider_state()
+                self.parent.stop_by_user = False
                 QTimer.singleShot(100, self.parent.ensure_playing_and_set_audio)
-                QTimer.singleShot(100, self.parent.update_tray_actions)
-                QTimer.singleShot(100, self.parent.update_slider_state)
         self.parent.skip_audio_poll = False
         super().accept()
 
@@ -1287,7 +1300,11 @@ class LDBPlayer(QMainWindow):
         self.list_player.set_playback_mode(vlc.PlaybackMode.repeat)
         self.playlist = []
         self.current_video_index = 0
+        self.is_currently_playing = False
         self.is_paused = False
+        self.slider_enabled = False
+        self.stop_by_user = False
+        self.ensure_valid = False
         self.is_fullscreen = False
         self.fullscreen_enabled = False
         self.selected_monitor_index = 0
@@ -1324,7 +1341,7 @@ class LDBPlayer(QMainWindow):
         QTimer.singleShot(1500, self.autoplay_last_video)
 
         if '--autostart' not in sys.argv:
-            QTimer.singleShot(50, self.bring_to_front)
+            QTimer.singleShot(0, self.bring_to_front)
 
     def bring_to_front(self):
         self.show()
@@ -1350,9 +1367,7 @@ class LDBPlayer(QMainWindow):
             return "No video playing"
 
     def update_slider_state(self):
-        state = self.player.get_state()
-        is_active = state in (vlc.State.Playing, vlc.State.Paused)
-        self.slider.setEnabled(is_active)
+        self.slider.setEnabled(self.slider_enabled)
 
     def is_duplicate_file(self, new_file, existing_files):
         new_name = os.path.basename(new_file)
@@ -1420,12 +1435,15 @@ class LDBPlayer(QMainWindow):
                 self.list_player.play_item_at_index(self.current_video_index)
                 self.play_pause_button.setIcon(QIcon(resource_path("icons/pause_icon.png")))
                 self.play_pause_button.setToolTip("Pause (Space)")
-                self.is_paused = False
                 video_name = os.path.basename(self.playlist[self.current_video_index])
                 self.current_video_label.setText(self.truncate_label_text(video_name))
+                self.is_currently_playing = True
+                self.is_paused = False
+                self.update_tray_actions()
+                self.slider_enabled = True
+                self.update_slider_state()
+                self.stop_by_user = False
                 QTimer.singleShot(100, self.ensure_playing_and_set_audio)
-                QTimer.singleShot(100, self.update_tray_actions)
-                QTimer.singleShot(100, self.update_slider_state)
             elif was_playing:
                 if was_paused:
                     self.play_pause_button.setIcon(QIcon(resource_path("icons/play_icon.png")))
@@ -1436,12 +1454,15 @@ class LDBPlayer(QMainWindow):
                 else:
                     self.play_pause_button.setIcon(QIcon(resource_path("icons/pause_icon.png")))
                     self.play_pause_button.setToolTip("Pause (Space)")
-                    self.is_paused = False
                     video_name = os.path.basename(self.playlist[self.current_video_index])
                     self.current_video_label.setText(self.truncate_label_text(video_name))
+                    self.is_currently_playing = True
+                    self.is_paused = False
+                    self.update_tray_actions()
+                    self.slider_enabled = True
+                    self.update_slider_state()
+                    self.stop_by_user = False
                     QTimer.singleShot(100, self.ensure_playing_and_set_audio)
-                    QTimer.singleShot(100, self.update_tray_actions)
-                    QTimer.singleShot(100, self.update_slider_state)
             event.acceptProposedAction()
         else:
             event.ignore()
@@ -1723,27 +1744,23 @@ class LDBPlayer(QMainWindow):
 
         self.tray_menu = CustomTrayMenu(self)
 
-        self.play_action = QAction("Play", self)
-        self.play_action.triggered.connect(self.play_pause)
-        self.tray_menu.addAction(self.play_action)
-
-        self.tray_menu.addSeparator()
-
-        self.stop_action = QAction("Stop", self)
-        self.stop_action.triggered.connect(self.stop)
-        self.tray_menu.addAction(self.stop_action)
-
-        self.tray_menu.addSeparator()
-
         show_action = QAction("Show", self)
         show_action.triggered.connect(self.restore_window)
         self.tray_menu.addAction(show_action)
 
-        self.tray_menu.addSeparator()
-
-        quit_action = QAction("Quit", self)
+        quit_action = QAction("Exit", self)
         quit_action.triggered.connect(self.quit_application)
         self.tray_menu.addAction(quit_action)
+
+        self.tray_menu.addSeparator()
+
+        self.play_action = QAction("Play", self)
+        self.play_action.triggered.connect(self.play_pause)
+        self.tray_menu.addAction(self.play_action)
+
+        self.stop_action = QAction("Stop", self)
+        self.stop_action.triggered.connect(self.stop)
+        self.tray_menu.addAction(self.stop_action)
 
         self.tray_icon.setIcon(QIcon(resource_path("icons/tray_icon.png")))
         self.tray_icon.setContextMenu(self.tray_menu)
@@ -1751,12 +1768,13 @@ class LDBPlayer(QMainWindow):
         self.tray_icon.show()
 
     def update_tray_actions(self):
-            if hasattr(self, 'play_action') and hasattr(self, 'stop_action'):
-                state = self.player.get_state()
-                has_playlist = bool(self.playlist)
-                is_playing = state == vlc.State.Playing
-                self.play_action.setEnabled(has_playlist and not is_playing)
-                self.stop_action.setEnabled(has_playlist and (is_playing or state == vlc.State.Paused))
+        if not (hasattr(self, 'play_action') and hasattr(self, 'stop_action')):
+            return
+
+        has_playlist = bool(self.playlist) and self.media_list.count() > 0
+
+        self.play_action.setEnabled(has_playlist and not self.is_currently_playing)
+        self.stop_action.setEnabled(has_playlist and (self.is_currently_playing or self.is_paused))
 
     def restore_window(self):
         if self.isMinimized():
@@ -1867,8 +1885,7 @@ class LDBPlayer(QMainWindow):
         win_id = int(self.video_window.winId())
         self.player.set_hwnd(win_id)
         if not is_fullscreen:
-            self.video_window.hide()
-            QTimer.singleShot(50, lambda: (self.activateWindow(), self.setFocus()))
+            QTimer.singleShot(0, lambda: (self.activateWindow(), self.setFocus()))
 
     def _force_delete_window(self):
         if hasattr(self, 'video_window') and self.video_window and not sip.isdeleted(self.video_window):
@@ -2041,13 +2058,16 @@ class LDBPlayer(QMainWindow):
 
             self.play_pause_button.setIcon(QIcon(resource_path("icons/pause_icon.png")))
             self.play_pause_button.setToolTip("Pause (Space)")
-            self.is_paused = False
             video_name = os.path.basename(self.playlist[self.current_video_index])
             self.current_video_label.setText(self.truncate_label_text(video_name))
 
+            self.is_currently_playing = True
+            self.is_paused = False
+            self.update_tray_actions()
+            self.slider_enabled = True
+            self.update_slider_state()
+            self.stop_by_user = False
             QTimer.singleShot(100, self.ensure_playing_and_set_audio)
-            QTimer.singleShot(100, self.update_tray_actions)
-            QTimer.singleShot(100, self.update_slider_state)
 
         except Exception:
             self.welcome_video_playing = False
@@ -2067,14 +2087,17 @@ class LDBPlayer(QMainWindow):
             self.list_player.play_item_at_index(self.current_video_index)
             self.play_pause_button.setIcon(QIcon(resource_path("icons/pause_icon.png")))
             self.play_pause_button.setToolTip("Pause (Space)")
-            self.is_paused = False
             video_name = os.path.basename(self.playlist[self.current_video_index])
             self.current_video_label.setText(self.truncate_label_text(video_name))
+            self.is_currently_playing = True
+            self.is_paused = False
+            self.update_tray_actions()
+            self.slider_enabled = True
+            self.update_slider_state()
+            self.stop_by_user = False
             QTimer.singleShot(100, self.ensure_playing_and_set_audio)
-            QTimer.singleShot(100, self.update_tray_actions)
-            QTimer.singleShot(100, self.update_slider_state)
         else:
-            self.stop()
+            return
 
     def open_settings(self):
         try:
@@ -2196,6 +2219,7 @@ class LDBPlayer(QMainWindow):
             self.current_video_index = min(self.current_video_index, len(self.playlist) - 1) if self.playlist else 0
             QTimer.singleShot(100, self.save_config_when_playing)
             self.load_playlist()
+            self.ensure_valid = True
             return bool(self.playlist)
 
         return True
@@ -2212,6 +2236,7 @@ class LDBPlayer(QMainWindow):
 
             if not self.ensure_valid_current_video():
                 return
+            self.ensure_valid = False
 
             if not hasattr(self, 'video_window') or not self.video_window or sip.isdeleted(self.video_window):
                 self.setup_video_window(is_fullscreen=self.is_fullscreen)
@@ -2234,11 +2259,20 @@ class LDBPlayer(QMainWindow):
                 video_name = os.path.basename(self.playlist[self.current_video_index])
                 self.current_video_label.setText(self.truncate_label_text(video_name))
                 QTimer.singleShot(100, self.ensure_playing_and_set_audio)
+        if self.list_player.is_playing() or (not self.is_paused):
+            self.is_currently_playing = True
+            self.is_paused = False
+        else:
+            self.is_currently_playing = False
+            self.is_paused = True
+        self.update_tray_actions()
+        self.slider_enabled = True
+        self.update_slider_state()
+        self.stop_by_user = False
         QTimer.singleShot(100, self.save_config_when_playing)
-        QTimer.singleShot(100, self.update_tray_actions)
-        QTimer.singleShot(100, self.update_slider_state)
 
     def stop(self):
+        self.stop_by_user = True
         self.list_player.stop()
         if hasattr(self, 'video_window') and self.video_window and not sip.isdeleted(self.video_window):
             self.player.set_hwnd(0)
@@ -2250,14 +2284,16 @@ class LDBPlayer(QMainWindow):
         self.slider.setValue(0)
         self.play_pause_button.setIcon(QIcon(resource_path("icons/play_icon.png")))
         self.play_pause_button.setToolTip("Play (Space)")
-        self.is_paused = False
         self.current_video_label.setText(self.truncate_label_text(self.get_current_video_display_text()))
         self.duration_label.setText("--:-- / --:--")
         if self.fullscreen_enabled and self.is_fullscreen:
             self.toggle_fullscreen()
-        self.save_config()
+        self.is_currently_playing = False
+        self.is_paused = False
         self.update_tray_actions()
+        self.slider_enabled = False
         self.update_slider_state()
+        self.save_config()
 
     def toggle_mute(self):
         self.is_muted = not self.is_muted
@@ -2316,6 +2352,7 @@ class LDBPlayer(QMainWindow):
 
         if not self.ensure_valid_current_video():
             return
+        self.ensure_valid = False
 
         if not hasattr(self, 'video_window') or not self.video_window or sip.isdeleted(self.video_window):
             self.setup_video_window(is_fullscreen=self.is_fullscreen)
@@ -2323,35 +2360,48 @@ class LDBPlayer(QMainWindow):
         self.list_player.play_item_at_index(self.current_video_index)
         self.play_pause_button.setIcon(QIcon(resource_path("icons/pause_icon.png")))
         self.play_pause_button.setToolTip("Pause (Space)")
-        self.is_paused = False
         video_name = os.path.basename(self.playlist[self.current_video_index])
         self.current_video_label.setText(self.truncate_label_text(video_name))
+        self.is_currently_playing = True
+        self.is_paused = False
+        self.update_tray_actions()
+        self.slider_enabled = True
+        self.update_slider_state()
+        self.stop_by_user = False
         QTimer.singleShot(100, self.ensure_playing_and_set_audio)
         QTimer.singleShot(100, self.save_config_when_playing)
-        QTimer.singleShot(100, self.update_tray_actions)
-        QTimer.singleShot(100, self.update_slider_state)
 
     def play_previous(self):
         if not self.playlist or self.media_list.count() == 0:
             return
+
+        original_index = self.current_video_index
+
         self.current_video_index = (self.current_video_index - 1) % len(self.playlist)
 
         if not self.ensure_valid_current_video():
             return
 
+        if self.ensure_valid and original_index != 0:
+            self.current_video_index = (self.current_video_index - 1) % len(self.playlist)
+        self.ensure_valid = False
+
         if not hasattr(self, 'video_window') or not self.video_window or sip.isdeleted(self.video_window):
             self.setup_video_window(is_fullscreen=self.is_fullscreen)
         self.video_window.show()
         self.list_player.play_item_at_index(self.current_video_index)
         self.play_pause_button.setIcon(QIcon(resource_path("icons/pause_icon.png")))
         self.play_pause_button.setToolTip("Pause (Space)")
-        self.is_paused = False
         video_name = os.path.basename(self.playlist[self.current_video_index])
         self.current_video_label.setText(self.truncate_label_text(video_name))
+        self.is_currently_playing = True
+        self.is_paused = False
+        self.update_tray_actions()
+        self.slider_enabled = True
+        self.update_slider_state()
+        self.stop_by_user = False
         QTimer.singleShot(100, self.ensure_playing_and_set_audio)
         QTimer.singleShot(100, self.save_config_when_playing)
-        QTimer.singleShot(100, self.update_tray_actions)
-        QTimer.singleShot(100, self.update_slider_state)
 
     def seek(self, position):
         pos = position / 1000.0
@@ -2399,14 +2449,7 @@ class LDBPlayer(QMainWindow):
                     break
             else:
                 self.current_video_index = 0
-                self.list_player.stop()
-                self.current_video_label.setText(self.truncate_label_text(self.get_current_video_display_text()))
-                if hasattr(self, 'video_window') and self.video_window and not sip.isdeleted(self.video_window):
-                    self.video_window.hide()
-                self.play_pause_button.setIcon(QIcon(resource_path("icons/play_icon.png")))
-                self.play_pause_button.setToolTip("Play (Space)")
-                self.is_paused = False
-                self.save_config()
+                self.stop()
                 return
         if not self.playlist:
             video_name = "Playlist is empty"
@@ -2426,21 +2469,40 @@ class LDBPlayer(QMainWindow):
         if self.player.get_state() == vlc.State.Playing:
             self.current_video_index = index
             self.current_video_label.setText(self.truncate_label_text(video_name))
-            self.video_window.show()
             self.play_pause_button.setIcon(QIcon(resource_path("icons/pause_icon.png")))
             self.play_pause_button.setToolTip("Pause (Space)")
+            self.is_currently_playing = True
             self.is_paused = False
 
     def handle_stop_event(self, event):
-        if hasattr(self, 'video_window') and self.video_window and not sip.isdeleted(self.video_window):
-            self.video_window.hide()
-        self.current_video_label.setText(self.truncate_label_text(self.get_current_video_display_text()))
-        self.duration_label.setText("--:-- / --:--")
+        if self.stop_by_user:
+            if hasattr(self, 'video_window') and self.video_window and not sip.isdeleted(self.video_window):
+                self.player.set_hwnd(0)
+                self.video_window.hide()
+                self.video_window.close()
+                self.video_window.deleteLater()
+                del self.video_window
+                self.video_window = None
+                return
+        else:
+            try:
+                QTimer.singleShot(0, self.play_next)
+            except:
+                self.slider.setValue(0)
+                self.play_pause_button.setIcon(QIcon(resource_path("icons/play_icon.png")))
+                self.play_pause_button.setToolTip("Play (Space)")
+                self.current_video_label.setText(self.truncate_label_text(self.get_current_video_display_text()))
+                self.duration_label.setText("--:-- / --:--")
+                if self.fullscreen_enabled and self.is_fullscreen:
+                    self.toggle_fullscreen()
+                self.is_currently_playing = False
+                self.is_paused = False
+                self.update_tray_actions()
+                self.slider_enabled = False
+                self.update_slider_state()
 
     def handle_error_event(self, event):
-        dialog = MessageDialog(self, "Playback Error", "An error occurred during playback.")
-        dialog.exec()
-        self.stop()
+        pass
 
     def handle_end_reached_event(self, event):
         pass
