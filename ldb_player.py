@@ -365,7 +365,7 @@ class HotkeysDialog(DialogBase):
             ("M", "Mute"),
             ("F12", "Settings"),
             ("F1", "About"),
-            ("Ctrl+F4", "Quit"),
+            ("Ctrl+F4", "Exit"),
             ("", ""),
             ("Playlist Hotkeys", ""),
             ("Ctrl+N", "Add"),
