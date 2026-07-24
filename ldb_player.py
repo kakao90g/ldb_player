@@ -1263,6 +1263,7 @@ class LDBPlayer(QMainWindow):
         self.config_file = os.path.join(self.config_dir, 'ldb_player_config.json')
         self.volume_debounce_timer = QTimer(self)
         self.volume_debounce_timer.setSingleShot(True)
+        self.volume_debounce_timer.timeout.connect(lambda: self.player.audio_set_volume(self.volume_slider.value()))
         self.skip_audio_poll = False
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.update_slider)
@@ -1271,7 +1272,6 @@ class LDBPlayer(QMainWindow):
         self.dragging = False
         self.drag_position = QPoint()
         self.setAcceptDrops(True)
-        self.video_window_initialized = False
         self.last_known_position = 0.0
         self.welcome_video_playing = False
         self.init_ui()
@@ -2230,8 +2230,9 @@ class LDBPlayer(QMainWindow):
         if not self.is_muted:
             try:
                 if value > 0:
-                    QTimer.singleShot(30, lambda: self.player.audio_set_volume(value))
+                    self.volume_debounce_timer.start(50)
                 else:
+                    self.volume_debounce_timer.stop()
                     self.player.audio_set_volume(0)
             except:
                 pass
