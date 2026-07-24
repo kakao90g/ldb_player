@@ -471,6 +471,7 @@ class SettingsDialog(DialogBase):
 
         self.parent.selected_monitor_index = self.monitor_combo.currentIndex()
 
+        self.parent.save_config()
         self.accept()
 
     def open_hotkeys(self):
@@ -1296,6 +1297,7 @@ class LDBPlayer(QMainWindow):
     def bring_to_front(self):
         self.show()
         self.raise_()
+        self.activateWindow()
         self.setFocus()
 
     def truncate_label_text(self, text):
