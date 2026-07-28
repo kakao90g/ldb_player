@@ -69,6 +69,10 @@ Join the community:
 - Discord: https://discord.gg/TAfUNGHYR3
 
 ## Version Changes
+- v1.1.4
+    - Added new instance handler and instance manager
+    - Added support for multi-instances (up to 32 instances)
+    - Updated display change playback behaviour
 - v1.1.3
     - Optimized code and memory efficiency
     - Latest stable release
