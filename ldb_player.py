@@ -388,7 +388,7 @@ class HotkeysDialog(DialogBase):
             ("", ""),
             ("Settings Hotkeys", ""),
             ("D", "Select Display"),
-            ("M", "Toggle Always Minimize"),
+            ("T", "Toggle Always Minimize"),
             ("A", "Toggle Autostart"),
             ("O", "Toggle Autostart Instances"),
             ("Ctrl+N", "New Instance"),
@@ -411,7 +411,7 @@ class SettingsDialog(DialogBase):
         super().__init__(parent, "Settings")
         self.setModal(True)
         self.parent = parent
-        monitor_label = QLabel("Select Display:")
+        monitor_label = QLabel("Select Display (D):")
         self.monitor_combo = QComboBox()
         self.monitor_combo.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.monitor_combo.addItems(parent.get_available_monitors())
@@ -420,7 +420,7 @@ class SettingsDialog(DialogBase):
         self.content_layout.addWidget(monitor_label)
         self.content_layout.addWidget(self.monitor_combo)
         if not self.parent.is_instance_0:
-            self.always_minimize_cb = QCheckBox("Always minimize to system tray on startup (M)")
+            self.always_minimize_cb = QCheckBox("Always minimize to system tray on startup (T)")
             self.always_minimize_cb.setChecked(parent.always_minimize)
             self.always_minimize_cb.setFocusPolicy(Qt.FocusPolicy.NoFocus)
             self.content_layout.addWidget(self.always_minimize_cb)
@@ -490,7 +490,7 @@ class SettingsDialog(DialogBase):
         elif event.key() == Qt.Key.Key_H:
             self.open_hotkeys()
         elif not self.parent.is_instance_0:
-            if event.key() == Qt.Key.Key_M:
+            if event.key() == Qt.Key.Key_T:
                 self.always_minimize_cb.setChecked(not self.always_minimize_cb.isChecked())
         elif self.parent.is_instance_0:
             if event.key() == Qt.Key.Key_A:
