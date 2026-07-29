@@ -69,6 +69,9 @@ Join the community:
 - Discord: https://discord.gg/TAfUNGHYR3
 
 ## Version Changes
+- v1.1.5
+    - Updated instance handler and instance manager
+    - Various improvements and bug fixes
 - v1.1.4
     - Added new instance handler and instance manager
     - Added support for multi-instances (up to 32 instances)

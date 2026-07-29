@@ -42,7 +42,7 @@ def welcome_resource_path():
 
 logging.basicConfig(level=logging.CRITICAL)
 
-VERSION = "1.1.4"
+VERSION = "1.1.5"
 
 QSS_STYLE = """
 QMainWindow, QDialog {
@@ -72,7 +72,7 @@ QPushButton#okButton, QPushButton#cancelButton, QPushButton#addButton, QPushButt
 QPushButton#moveUpButton, QPushButton#moveDownButton, QPushButton#shuffleButton, QPushButton#clearButton,
 QPushButton#saveButton, QPushButton#loadButton, QPushButton#manageButton, QPushButton#renameButton,
 QPushButton#deleteButton, QPushButton#playSelectedButton, QPushButton#newInstanceButton, QPushButton#instanceManagerButton,
-QPushButton#refreshButton, QPushButton#hotkeysButton, QPushButton#checkUpdatesButton {
+QPushButton#runButton, QPushButton#refreshButton, QPushButton#hotkeysButton, QPushButton#checkUpdatesButton {
     width: 80px;
     height: 32px;
     border-radius: 16px;
@@ -397,8 +397,9 @@ class HotkeysDialog(DialogBase):
             ("U", "Check for Updates"),
             ("", ""),
             ("Instance Manager Hotkeys", ""),
-            ("F5", "Refresh"),
-            ("Del", "Delete")
+            ("Ctrl+R", "Run"),
+            ("Del", "Delete"),
+            ("F5", "Refresh")
         ]
         self.hotkeys_table.setRowCount(len(hotkeys))
         for row, (hotkey, function) in enumerate(hotkeys):
@@ -1315,8 +1316,6 @@ class InstanceManagerDialog(DialogBase):
         super().__init__(parent, "Instance Manager")
         self.parent = parent
         self.config_dir = parent.config_dir
-        self.exe_dir = get_exe_dir()
-
         self.instance_list = QListWidget()
         self.list_widget = self.instance_list
         self.instance_list.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
@@ -1325,13 +1324,12 @@ class InstanceManagerDialog(DialogBase):
 
         button_layout1 = QHBoxLayout()
         button_layout1.setSpacing(10)
-
-        refresh_button = QPushButton("Refresh")
-        refresh_button.setObjectName("refreshButton")
-        refresh_button.setToolTip("Refresh (F5)")
-        refresh_button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        refresh_button.clicked.connect(self.update_instance_list)
-        button_layout1.addWidget(refresh_button)
+        run_button = QPushButton("Run")
+        run_button.setObjectName("runButton")
+        run_button.setToolTip("Run (Ctrl+R)")
+        run_button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        run_button.clicked.connect(self.run_instance)
+        button_layout1.addWidget(run_button)
 
         delete_button = QPushButton("Delete")
         delete_button.setObjectName("deleteButton")
@@ -1339,26 +1337,35 @@ class InstanceManagerDialog(DialogBase):
         delete_button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         delete_button.clicked.connect(self.delete_instance)
         button_layout1.addWidget(delete_button)
-
         self.content_layout.addLayout(button_layout1)
 
         button_layout2 = QHBoxLayout()
         button_layout2.setSpacing(10)
+        refresh_button = QPushButton("Refresh")
+        refresh_button.setObjectName("refreshButton")
+        refresh_button.setToolTip("Refresh (F5)")
+        refresh_button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        refresh_button.clicked.connect(self.update_instance_list)
+        button_layout2.addWidget(refresh_button)
+        self.content_layout.addLayout(button_layout2)
 
+        button_layout3 = QHBoxLayout()
+        button_layout3.setSpacing(10)
         ok_button = QPushButton("OK")
         ok_button.setObjectName("okButton")
         ok_button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         ok_button.setDefault(True)
         ok_button.setAutoDefault(True)
         ok_button.clicked.connect(self.accept)
-        button_layout2.addWidget(ok_button)
-
-        self.content_layout.addLayout(button_layout2)
+        button_layout3.addWidget(ok_button)
+        self.content_layout.addLayout(button_layout3)
 
         self.update_instance_list()
 
     def keyPressEvent(self, event):
-        if event.key() == Qt.Key.Key_Delete:
+        if event.modifiers() & Qt.KeyboardModifier.ControlModifier and event.key() == Qt.Key.Key_R:
+            self.run_instance()
+        elif event.key() == Qt.Key.Key_Delete:
             self.delete_instance()
         elif event.key() == Qt.Key.Key_F5:
             self.update_instance_list()
@@ -1372,61 +1379,80 @@ class InstanceManagerDialog(DialogBase):
     def update_instance_list(self):
         self.instance_list.clear()
         instances = []
-
         try:
-            for fname in os.listdir(self.exe_dir):
-                if fname.startswith("LDBPlayer_") and fname.lower().endswith(".exe"):
+            for fname in os.listdir(self.config_dir):
+                if fname.startswith("ldb_player_config_") and fname.endswith(".json"):
                     try:
-                        id_str = fname[len("LDBPlayer_"):-4]
+                        id_str = fname[len("ldb_player_config_"):-len(".json")]
                         iid = int(id_str)
                         if iid <= 0:
                             continue
-                        instances.append((iid, fname))
+                        instances.append(iid)
                     except ValueError:
                         continue
-
-            instances.sort(key=lambda x: x[0])
-
-            for iid, fname in instances:
+            instances.sort()
+            for iid in instances:
                 running = self._is_instance_running(iid)
                 display = f"Instance {iid} - Running" if running else f"Instance {iid}"
                 item = QListWidgetItem(display)
                 item.setData(Qt.ItemDataRole.UserRole, iid)
-                item.setData(Qt.ItemDataRole.UserRole + 1, fname)
                 self.instance_list.addItem(item)
-
         except Exception:
             pass
-
         self.instance_list.clearSelection()
         self.instance_list.setFocus()
 
     def _is_instance_running(self, iid: int) -> bool:
-        lock_path = os.path.join(self.config_dir, f"instance_{iid}.lock")
-        if not os.path.exists(lock_path):
-            return False
-        try:
-            with open(lock_path, "r") as f:
-                pid = int(f.read().strip())
-            return self.parent.instance_manager._is_pid_alive(pid)
-        except Exception:
-            return False
+        if self.parent.is_instance_running(iid):
+            return True
+        return False
 
-    def delete_instance(self):
+    def run_instance(self):
         if self.instance_list.count() == 0 or not self.instance_list.selectedItems():
             return
 
         item = self.instance_list.currentItem()
-        selected_row = self.instance_list.currentRow()
         if not item:
             return
 
         iid = item.data(Qt.ItemDataRole.UserRole)
-        fname = item.data(Qt.ItemDataRole.UserRole + 1)
-        exe_path = os.path.join(self.exe_dir, fname)
+
+        if self._is_instance_running(iid):
+            dialog = MessageDialog(self, "Error", f"Instance {iid} is already running.")
+            dialog.exec()
+            return
+
+        try:
+            if getattr(sys, 'frozen', False):
+                exe_path = sys.executable
+                cmd = [exe_path, f"--instance-id={iid}"]
+                cwd = os.path.dirname(exe_path)
+            else:
+                script = os.path.abspath(sys.argv[0])
+                cmd = [sys.executable, script, f"--instance-id={iid}"]
+                cwd = os.path.dirname(script)
+
+            subprocess.Popen(
+                cmd,
+                cwd=cwd,
+                creationflags=subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
+            )
+
+            QTimer.singleShot(1200, self.update_instance_list)
+        except Exception as e:
+            dialog = MessageDialog(self, "Error", f"Failed to run instance {iid}: {str(e)}")
+            dialog.exec()
+
+    def delete_instance(self):
+        if self.instance_list.count() == 0 or not self.instance_list.selectedItems():
+            return
+        item = self.instance_list.currentItem()
+        selected_row = self.instance_list.currentRow()
+        if not item:
+            return
+        iid = item.data(Qt.ItemDataRole.UserRole)
         config_path = os.path.join(self.config_dir, f"ldb_player_config_{iid}.json")
         lock_path = os.path.join(self.config_dir, f"instance_{iid}.lock")
-
         is_running = self._is_instance_running(iid)
 
         if is_running:
@@ -1442,7 +1468,6 @@ class InstanceManagerDialog(DialogBase):
                 "Confirm Delete",
                 f"Are you sure you want to delete Instance {iid}?"
             )
-
         if dialog.exec() != QDialog.DialogCode.Accepted:
             if selected_row >= 0 and selected_row < self.instance_list.count():
                 self.instance_list.setCurrentRow(selected_row)
@@ -1460,16 +1485,12 @@ class InstanceManagerDialog(DialogBase):
                     win32api.CloseHandle(handle)
             except Exception:
                 pass
-
-            QTimer.singleShot(1200, lambda: self._finish_delete(iid, exe_path, config_path, lock_path, selected_row))
+            QTimer.singleShot(1200, lambda: self._finish_delete(iid, config_path, lock_path, selected_row))
             return
+        self._finish_delete(iid, config_path, lock_path, selected_row)
 
-        self._finish_delete(iid, exe_path, config_path, lock_path, selected_row)
-
-    def _finish_delete(self, iid, exe_path, config_path, lock_path, selected_row):
+    def _finish_delete(self, iid, config_path, lock_path, selected_row):
         try:
-            if os.path.exists(exe_path):
-                os.remove(exe_path)
             if os.path.exists(config_path):
                 os.remove(config_path)
             if os.path.exists(lock_path):
@@ -1477,7 +1498,6 @@ class InstanceManagerDialog(DialogBase):
                     os.remove(lock_path)
                 except OSError:
                     pass
-
             self.update_instance_list()
             if self.instance_list.count() > 0:
                 new_row = min(selected_row, self.instance_list.count() - 1)
@@ -1491,12 +1511,10 @@ class InstanceManager:
     def __init__(self, config_dir: str, forced_id: int | None = None):
         self.config_dir = config_dir
         os.makedirs(self.config_dir, exist_ok=True)
-
         if forced_id is not None:
             self.instance_id = forced_id
         else:
             self.instance_id = self._acquire_instance_id()
-
         self.lock_file = os.path.join(self.config_dir, f"instance_{self.instance_id}.lock")
         self._write_lock()
         atexit.register(self.release)
@@ -1513,26 +1531,38 @@ class InstanceManager:
             return False
         return False
 
+    def _server_is_alive(self, iid: int) -> bool:
+        from PyQt6.QtNetwork import QLocalSocket
+        socket = QLocalSocket()
+        socket.connectToServer(f"LDBPlayerInstance{iid}")
+        alive = socket.waitForConnected(150)
+        if alive:
+            socket.disconnectFromServer()
+        return alive
+
     def _acquire_instance_id(self) -> int:
         used = set()
-        for fname in os.listdir(self.config_dir):
-            if fname.startswith("instance_") and fname.endswith(".lock"):
+        try:
+            for fname in os.listdir(self.config_dir):
+                if not (fname.startswith("instance_") and fname.endswith(".lock")):
+                    continue
                 try:
                     id_str = fname[len("instance_"):-len(".lock")]
                     iid = int(id_str)
                     lock_path = os.path.join(self.config_dir, fname)
-                    with open(lock_path, "r") as f:
-                        pid = int(f.read().strip())
-                    if self._is_pid_alive(pid):
-                        used.add(iid)
-                    else:
 
+                    if not self._server_is_alive(iid):
                         try:
                             os.remove(lock_path)
                         except OSError:
                             pass
+                        continue
+
+                    used.add(iid)
                 except (ValueError, OSError):
                     continue
+        except Exception:
+            pass
 
         for i in range(0, 32):
             if i not in used:
@@ -1551,22 +1581,19 @@ class InstanceManager:
             pass
 
     def get_config_path(self) -> str:
-            numbered = os.path.join(self.config_dir, f"ldb_player_config_{self.instance_id}.json")
-
-            if self.instance_id == 0:
-                old_shared = os.path.join(self.config_dir, "ldb_player_config.json")
-                if os.path.exists(old_shared) and not os.path.exists(numbered):
-                    try:
-                        os.rename(old_shared, numbered)
-                    except OSError:
-                        pass
-            return numbered
-
-SERVER_NAME = "LDBPlayerInstance0"
+        numbered = os.path.join(self.config_dir, f"ldb_player_config_{self.instance_id}.json")
+        if self.instance_id == 0:
+            old_shared = os.path.join(self.config_dir, "ldb_player_config.json")
+            if os.path.exists(old_shared) and not os.path.exists(numbered):
+                try:
+                    os.rename(old_shared, numbered)
+                except OSError:
+                    pass
+        return numbered
 
 def try_activate_existing_instance_0() -> bool:
     socket = QLocalSocket()
-    socket.connectToServer(SERVER_NAME)
+    socket.connectToServer("LDBPlayerInstance0")
     if socket.waitForConnected(300):
         socket.write(b"restore")
         socket.waitForBytesWritten(300)
@@ -1590,11 +1617,11 @@ class LDBPlayer(QMainWindow):
         self.instance_id = self.instance_manager.instance_id
         self.config_file = self.instance_manager.get_config_path()
         self.is_instance_0 = (self.instance_id == 0)
-        if self.is_instance_0:
-            self.local_server = QLocalServer(self)
-            QLocalServer.removeServer(SERVER_NAME)
-            if self.local_server.listen(SERVER_NAME):
-                self.local_server.newConnection.connect(self._on_local_connection)
+        server_name = f"LDBPlayerInstance{self.instance_id}"
+        self.local_server = QLocalServer(self)
+        QLocalServer.removeServer(server_name)
+        if self.local_server.listen(server_name):
+            self.local_server.newConnection.connect(self._on_local_connection)
         self.setWindowIcon(QIcon(resource_path("icons/tray_icon.png")))
         title = "LDB Player" if self.is_instance_0 else f"LDB Player (Instance {self.instance_id})"
         self.setWindowTitle(title)
@@ -1685,39 +1712,43 @@ class LDBPlayer(QMainWindow):
         data = socket.readAll().data()
         if data == b"restore":
             self.restore_window()
+        elif data == b"quit":
+            QTimer.singleShot(0, self._final_quit)
         socket.disconnectFromServer()
+
+    def is_instance_running(self, iid: int) -> bool:
+        return self.instance_manager._server_is_alive(iid)
 
     def launch_other_instances(self):
         if not self.is_instance_0 or not self.autostart_other_instances:
             return
-        if not getattr(sys, 'frozen', False):
-            return
 
-        exe_dir = get_exe_dir()
+        if getattr(sys, 'frozen', False):
+            exe_path = sys.executable
+            base_cmd = [exe_path]
+            cwd = os.path.dirname(exe_path)
+        else:
+            script = os.path.abspath(sys.argv[0])
+            base_cmd = [sys.executable, script]
+            cwd = os.path.dirname(script)
+
         try:
-            for fname in os.listdir(exe_dir):
-                if not (fname.startswith("LDBPlayer_") and fname.lower().endswith(".exe")):
+            for fname in os.listdir(self.config_dir):
+                if not (fname.startswith("ldb_player_config_") and fname.endswith(".json")):
                     continue
                 try:
-                    id_str = fname[len("LDBPlayer_"):-4]
+                    id_str = fname[len("ldb_player_config_"):-len(".json")]
                     iid = int(id_str)
                     if iid <= 0:
                         continue
 
-                    lock_path = os.path.join(self.config_dir, f"instance_{iid}.lock")
-                    if os.path.exists(lock_path):
-                        try:
-                            with open(lock_path, "r") as f:
-                                pid = int(f.read().strip())
-                            if self.instance_manager._is_pid_alive(pid):
-                                continue
-                        except Exception:
-                            pass
+                    if self.is_instance_running(iid):
+                        continue
 
-                    exe_path = os.path.join(exe_dir, fname)
+                    cmd = base_cmd + [f"--instance-id={iid}"]
                     subprocess.Popen(
-                        [exe_path, f"--instance-id={iid}"],
-                        cwd=exe_dir,
+                        cmd,
+                        cwd=cwd,
                         creationflags=subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
                     )
                 except ValueError:
@@ -2149,35 +2180,29 @@ class LDBPlayer(QMainWindow):
 
     def launch_new_instance(self):
         try:
-            if not getattr(sys, 'frozen', False):
-                dialog = MessageDialog(
-                    self,
-                    "Info",
-                    "Creating additional instances is only supported when running the compiled .exe."
-                )
-                dialog.exec()
-                return
-
-            original_exe = sys.executable
-            exe_dir = os.path.dirname(original_exe)
-
             next_id = self.instance_manager._acquire_instance_id()
             while next_id == self.instance_id:
                 next_id += 1
 
-            new_exe_name = f"LDBPlayer_{next_id}.exe"
-            new_exe_path = os.path.join(exe_dir, new_exe_name)
+            new_config = os.path.join(self.config_dir, f"ldb_player_config_{next_id}.json")
+            if not os.path.exists(new_config):
+                with open(new_config, "w", encoding="utf-8") as f:
+                    json.dump({}, f)
 
-            if not os.path.exists(new_exe_path):
-                import shutil
-                shutil.copy2(original_exe, new_exe_path)
+            if getattr(sys, 'frozen', False):
+                exe_path = sys.executable
+                cmd = [exe_path, f"--instance-id={next_id}"]
+                cwd = os.path.dirname(exe_path)
+            else:
+                script = os.path.abspath(sys.argv[0])
+                cmd = [sys.executable, script, f"--instance-id={next_id}"]
+                cwd = os.path.dirname(script)
 
             subprocess.Popen(
-                [new_exe_path, f"--instance-id={next_id}"],
-                cwd=exe_dir,
+                cmd,
+                cwd=cwd,
                 creationflags=subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
             )
-
         except Exception as e:
             dialog = MessageDialog(self, "Error", f"Failed to launch new instance: {str(e)}")
             dialog.exec()
@@ -2896,18 +2921,21 @@ class LDBPlayer(QMainWindow):
         running = {}
         try:
             for fname in os.listdir(self.config_dir):
-                if fname.startswith("instance_") and fname.endswith(".lock"):
-                    try:
-                        iid = int(fname[len("instance_"):-len(".lock")])
-                        if iid == self.instance_id:
-                            continue
-                        lock_path = os.path.join(self.config_dir, fname)
-                        with open(lock_path, "r") as f:
-                            pid = int(f.read().strip())
-                        if self.instance_manager._is_pid_alive(pid):
-                            running[iid] = pid
-                    except (ValueError, OSError):
+                if not (fname.startswith("instance_") and fname.endswith(".lock")):
+                    continue
+                try:
+                    iid = int(fname[len("instance_"):-len(".lock")])
+                    if iid == self.instance_id:
                         continue
+                    if not self.is_instance_running(iid):
+                        continue
+                    lock_path = os.path.join(self.config_dir, fname)
+                    with open(lock_path, "r") as f:
+                        pid = int(f.read().strip())
+                    if self.instance_manager._is_pid_alive(pid):
+                        running[iid] = pid
+                except (ValueError, OSError):
+                    continue
         except Exception:
             pass
         return running
@@ -2925,25 +2953,16 @@ class LDBPlayer(QMainWindow):
                     if dialog.exec() != QDialog.DialogCode.Accepted:
                         return
 
-                try:
-                    import win32api, win32con
-                    for iid, pid in other_instances.items():
-                        try:
-                            handle = win32api.OpenProcess(win32con.PROCESS_TERMINATE, False, pid)
-                            if handle:
-                                win32api.TerminateProcess(handle, 0)
-                                win32api.CloseHandle(handle)
-                        except Exception:
-                            pass
-                except Exception:
-                    pass
-
+                from PyQt6.QtNetwork import QLocalSocket
                 for iid in other_instances:
-                    lock_path = os.path.join(self.config_dir, f"instance_{iid}.lock")
                     try:
-                        if os.path.exists(lock_path):
-                            os.remove(lock_path)
-                    except OSError:
+                        sock = QLocalSocket()
+                        sock.connectToServer(f"LDBPlayerInstance{iid}")
+                        if sock.waitForConnected(200):
+                            sock.write(b"quit")
+                            sock.waitForBytesWritten(200)
+                            sock.disconnectFromServer()
+                    except Exception:
                         pass
 
                 QTimer.singleShot(1200, self._final_quit)
@@ -2961,7 +2980,17 @@ class LDBPlayer(QMainWindow):
         except Exception:
             pass
 
-        QApplication.quit()
+        if not self.is_instance_0:
+            try:
+                import win32api, win32con
+                handle = win32api.OpenProcess(win32con.PROCESS_TERMINATE, False, os.getpid())
+                if handle:
+                    win32api.TerminateProcess(handle, 0)
+                    win32api.CloseHandle(handle)
+            except Exception:
+                os._exit(0)
+        else:
+            QApplication.quit()
 
 if __name__ == '__main__':
     is_forced_instance = any(arg.startswith("--instance-id=") for arg in sys.argv)
