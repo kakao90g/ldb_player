@@ -3,9 +3,10 @@
 LDB Player is a Windows-specific media player that transforms your desktop into a live video player. It supports playlists, global hotkeys, drag-and-drop, multi-monitor displays, and seamless desktop integration.
 
 ![LDB Player Main UI](screenshots/main-ui.png)
+![LDB Player Multi Instance](screenshots/multi-instance.png)
 
 ## Now available in Microsoft Store
-- Download link: https://apps.microsoft.com/detail/9PP860QK40K2?hl=en-us&gl=US&ocid=pdpshare
+- Download link: https://apps.microsoft.com/store/detail/9PP860QK40K2?cid=DevShareMCLPCS
 - Currently supported regions as of 07/07/2026.
     - English (United States)
 
@@ -69,6 +70,9 @@ Join the community:
 - Discord: https://discord.gg/TAfUNGHYR3
 
 ## Version Changes
+- v1.1.6
+    - Added a small tweak for multi-instances
+    - Latest stable release
 - v1.1.5
     - Updated instance handler and instance manager
     - Various improvements and bug fixes
@@ -78,7 +82,7 @@ Join the community:
     - Updated display change playback behavior
 - v1.1.3
     - Optimized code and memory efficiency
-    - Latest stable release
+    - Stable release
 - v1.1.2
     - Fixed critical playback issues
     - Minimal UI adjustments

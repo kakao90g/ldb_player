@@ -42,7 +42,7 @@ def welcome_resource_path():
 
 logging.basicConfig(level=logging.CRITICAL)
 
-VERSION = "1.1.5"
+VERSION = "1.1.6"
 
 QSS_STYLE = """
 QMainWindow, QDialog {
@@ -2979,18 +2979,20 @@ class LDBPlayer(QMainWindow):
             self.instance_manager.release()
         except Exception:
             pass
-
         if not self.is_instance_0:
-            try:
-                import win32api, win32con
-                handle = win32api.OpenProcess(win32con.PROCESS_TERMINATE, False, os.getpid())
-                if handle:
-                    win32api.TerminateProcess(handle, 0)
-                    win32api.CloseHandle(handle)
-            except Exception:
-                os._exit(0)
+            QTimer.singleShot(600, self.close_instance)
         else:
             QApplication.quit()
+
+    def close_instance(self):
+        try:
+            import win32api, win32con
+            handle = win32api.OpenProcess(win32con.PROCESS_TERMINATE, False, os.getpid())
+            if handle:
+                win32api.TerminateProcess(handle, 0)
+                win32api.CloseHandle(handle)
+        except Exception:
+            os._exit(0)
 
 if __name__ == '__main__':
     is_forced_instance = any(arg.startswith("--instance-id=") for arg in sys.argv)
