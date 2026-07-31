@@ -9,6 +9,7 @@ LDB Player is a Windows-specific media player that transforms your desktop into 
 - Download link: https://apps.microsoft.com/store/detail/9PP860QK40K2?cid=DevShareMCLPCS
 - Currently supported regions as of 07/07/2026.
     - English (United States)
+- Please check the **FAQ** section below.
 
 ## Features
 - Play videos as live desktop backgrounds.
@@ -62,11 +63,48 @@ The updater is a separate script (updater.py) that handles downloading and repla
 - Utilizes Windows APIs via pywin32 for system integration.
 - Other dependencies: Python standard libraries (sys, os, json, etc.), vlc.py bindings.
 
-Support the project:
+## FAQ
+
+**1. How do I add files to play?**
+- Open the playlist by pressing **Q** on the keyboard, or click the playlist icon on the main player, then select **Add files**.
+- Drag and drop a video file directly onto the player — it will be automatically added to the playlist.
+
+**2. What file types are currently supported?**
+- `.mp4`, `.mkv`, `.avi`, `.mov`, `.wmv`, `.flv`, `.webm`, `.mpeg`, `.mpg`, `.m4v`
+
+**3. Why can't I see my desktop icons?**
+- The video window is placed above your desktop icons (and below other open applications). This is normal behavior.
+
+**4. When playing vertical "Shorts" videos, I see my desktop wallpaper on the left and right sides. Is this normal?**
+- Yes. The current version does not change your wallpaper settings. For a cleaner look, you can temporarily set your desktop background to a solid color.
+
+**5. The Windows taskbar blocks the bottom of the video. How do I fix this?**
+- Right-click the taskbar → **Taskbar settings** → Enable **Automatically hide the taskbar**.
+
+**6. How do I create or run a new instance?**
+- Go to **Settings** → **Create a new LDB Player instance...** → **Confirm the creation**.
+
+**7. What does a new instance do?**
+- It allows you to run LDB Player on multiple displays.
+- Each new instance has its own save configuration file for independent customization.
+
+**8. How do I check which instances are currently open or running?**
+- Go to **Settings** → **Instance Manager**.  
+  A list of all created instances will be shown. Deleting an instance here will also clean up its save configuration files.
+
+**9. How do I support the project or developer?**
+- Share LDB Player with your friends.
+- ⭐ Star the repository on GitHub: https://github.com/kakao90g/ldb_player
+- Send a tip through the in-app sponsor links or via the links below.
+
+**Currently Known Issues**
+- Please report any issues you experience with the current version on GitHub Issues or in the Discord server.
+
+**Support the project:**
 - GitHub Sponsors: https://github.com/sponsors/kakao90g
 - PayPal: https://paypal.me/kakao90g
 
-Join the community:
+**Join the community:**
 - Discord: https://discord.gg/TAfUNGHYR3
 
 ## Version Changes
