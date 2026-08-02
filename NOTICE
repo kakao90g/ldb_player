@@ -1,0 +1,34 @@
+LDB Player - Third-Party Notices
+================================
+
+This application is open source and licensed under the MIT License.
+Full license text: https://github.com/kakao90g/ldb_player/blob/main/LICENSE
+
+The application uses the following third-party components:
+
+1. VLC media player (libVLC)
+   Copyright (C) VideoLAN and VLC authors
+   License: LGPLv2.1 or later (libVLC / libVLCcore)
+            Some modules and plugins remain under GPLv2 or later
+   Website: https://www.videolan.org/vlc/
+   Source:  https://code.videolan.org/videolan/vlc
+
+2. PyQt6
+   Copyright (C) Riverbank Computing Limited
+   License: GNU General Public License v3 (or later) or commercial license
+   Website: https://www.riverbankcomputing.com/software/pyqt/
+
+3. python-vlc (Python bindings for libVLC)
+   License: LGPLv2.1 or later (consistent with libVLC)
+   Repository: https://github.com/oaubert/python-vlc
+
+4. Additional Python packages and system libraries
+   (pywin32, requests, and others)
+   Their individual licenses are available in the respective package
+   metadata and in the source repository.
+
+Full license texts for all dependencies are included with the application
+or can be found in the GitHub repository.
+
+If you have questions about licensing, please open an issue or contact
+the developer via the links in the README.

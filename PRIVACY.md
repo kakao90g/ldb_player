@@ -1,6 +1,6 @@
 # Privacy Policy for LDB Player
 
-Last updated: June 30, 2026
+Last updated: 08/02/2026
 
 ## Information We Collect
 LDB Player does not collect, store, or transmit any personal information.
@@ -9,7 +9,7 @@ LDB Player does not collect, store, or transmit any personal information.
 - No analytics or tracking
 - No access to your files or personal data
 
-## Update Checking
+## Update Checking (GitHub version only)
 The app optionally checks for updates by connecting to GitHub. This process only transmits your current app version and does not include any personal data.
 
 ## Data from Third Parties
