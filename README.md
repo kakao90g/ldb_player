@@ -1,36 +1,174 @@
 # LDB Player (Live Desktop Background Player)
 
-LDB Player is a Windows-specific media player that transforms your desktop into a live video player. It supports playlists, global hotkeys, drag-and-drop, multi-monitor displays, and seamless desktop integration.
+LDB Player is a lightweight and powerful live wallpaper player for Windows. It features a new live set system (interactive live wallpapers) which opens endless possibilities for desktop customization.
 
 ![LDB Player Main UI](screenshots/main-ui.png)
 ![LDB Player Multi Instance](screenshots/multi-instance.png)
 
-## Now available in Microsoft Store
+## Important: Version & License Split (as of v1.2.0)
+
+| Version          | License              | Distribution                          | Status          |
+|------------------|----------------------|---------------------------------------|-----------------|
+| **v1.2.0+**      | Proprietary          | Microsoft Store only                  | Current / Official |
+| **v1.1.6 and earlier** | MIT (open source) | GitHub Releases (legacy)             | Archived        |
+
+- The Microsoft Store version (v1.2.0 and later) is the **official** release. It includes new features (including the live set system) and is closed-source.
+- Older versions (v1.1.6 and below) remain available under the original MIT license for historical / archival purposes only. No further open-source development is planned on that line.
+
+## Latest official version available in Microsoft Store
 - Download link: https://apps.microsoft.com/store/detail/9PP860QK40K2?cid=DevShareMCLPCS
 - Currently supported regions as of 07/07/2026.
     - English (United States)
 - Please check the **FAQ** section below.
 
 ## Features
-- Play videos as live desktop backgrounds.
-- Multi-display support — choose which monitor to use in Settings.
+- Play videos as live wallpapers.
+- Play and create new proprietary live sets (interactive live wallpapers).
+- Multi-display & multi-instance support — of up to 32 simultaneous instances.
+- Smart auto-play feature on system startup adjustable in Settings.
 - Playlist management: Add, remove, shuffle, save, and load playlists.
 - Global hotkeys for playback control, volume adjustment, seeking, and navigation.
-- Repeat modes (single video or entire playlist).
-- Auto play feature on system restart adjustable in Settings.
+- Repeat modes (single video, entire playlist and auto-mode for live sets).
 - Dark-themed, modern user interface.
 
 ## Requirements
 - Windows 11.
 - VLC media player (optional but recommended, download from https://www.videolan.org/vlc/).
 
-## GitHub Releases  
-- Download the latest version from the [Releases](https://github.com/kakao90g/ldb_player/releases) page.
+## GitHub Releases (legacy)
+- Download earlier versions from the [Releases](https://github.com/kakao90g/ldb_player/releases) page.
 
-## Usage
+## Quick Start Guide
 - Add videos via drag-and-drop or by using the playlist menu.
 - Control playback with hotkeys: Space (play/pause), Arrow keys (seek/volume), etc. (View the full list in Settings > Hotkeys).
 - Configuration is saved in %APPDATA%\LDBPlayer.
+
+## Live Sets — Creating Interactive Wallpapers
+
+Live Sets let you build interactive wallpapers. Users can click regions on the screen to trigger **actions** and **supers**, fill a super meter, and move between stages.
+
+### Setup
+
+1. Put all videos **and** the `.json` file in the **same folder**.
+2. Use **16:9** videos with the **same resolution, codec, and file type** (recommended: H.264 `.mp4`).
+3. Copy the template below → paste into Notepad / VS Code → save as `yourprojectname.json` (All Files / UTF-8).
+
+Geometries are written for **1080p (1920×1080)** and automatically scale to the user’s screen.
+
+### Template
+
+```json
+{
+  "name": "New live set name",
+  "save_point": false,
+  "saved_stage": null,
+  "random": 0,
+  "stages": {
+    "entrance_001": { "video": "entrance01.mp4", "next": "main_001" },
+    "main_001": {
+      "video": "main01.mp4",
+      "super_cost": 25,
+      "actions": [
+        { "id": "action_001", "geometry": [0, 0, 960, 540], "video": "action01.mp4", "next": null },
+        { "id": "action_002", "geometry": [960, 0, 1920, 540], "video": "action02.mp4", "next": null },
+        { "id": "action_003", "geometry": [0, 540, 960, 1080], "video": "action03.mp4", "next": null },
+        { "id": "action_004", "geometry": [960, 540, 1920, 1080], "video": "action04.mp4", "next": null }
+      ],
+      "supers": [
+        { "id": "super_001", "geometry": [0, 0, 960, 540], "video": "super01.mp4", "next": "entrance_002" },
+        { "id": "super_002", "geometry": [960, 0, 1920, 540], "video": "super02.mp4", "next": "entrance_002" }
+      ]
+    },
+
+    "entrance_002": { "video": "entrance02.mp4", "next": "main_002" },
+    "main_002": {
+      "video": "main02.mp4",
+      "super_cost": 30,
+      "actions": [
+        { "id": "action_001", "geometry": [0, 0, 960, 540], "video": "action05.mp4", "next": null },
+        { "id": "action_002", "geometry": [960, 0, 1920, 540], "video": "action06.mp4", "next": null }
+      ],
+      "supers": [
+        { "id": "super_001", "geometry": [0, 540, 960, 1080], "video": "super01.mp4", "next": "entrance_003" },
+        { "id": "super_002", "geometry": [960, 540, 1920, 1080], "video": "super02.mp4", "next": "entrance_003" }
+      ]
+    },
+
+    "entrance_003": { "video": "entrance03.mp4", "next": "main_003" },
+    "main_003": {
+      "video": "main03.mp4",
+      "super_cost": 40,
+      "actions": [
+        { "id": "action_001", "geometry": [0, 0, 960, 540], "video": "action07.mp4", "next": null },
+        { "id": "action_002", "geometry": [960, 0, 1920, 540], "video": "action08.mp4", "next": null }
+      ],
+      "supers": [
+        { "id": "super_001", "geometry": [0, 540, 960, 1080], "video": "super01.mp4", "next": "entrance_001" },
+        { "id": "super_002", "geometry": [960, 540, 1920, 1080], "video": "super02.mp4", "next": "entrance_001" }
+      ]
+    }
+  }
+}
+```
+
+### Field Reference
+
+| Field | Meaning |
+|-------|---------|
+| `name` | Your project name |
+| `save_point` | `true` = remember last main stage and resume from it |
+| `saved_stage` | Controlled by the player (`null` or `"main_00x"`). Leave as `null` when distributing |
+| `random` | `0` = off. Any number = seconds between auto-triggers of an action/super |
+| `super_cost` | `0` = off. Any number = how much each action fills the super meter (max 100). When meter reaches 100, action regions are replaced by super regions |
+| `video` | Filename (must be in the same folder) |
+| `next` | Where to go after the clip finishes: `null` (stay on current main) or `"entrance_00x"` / `"main_00x"` |
+
+**Fixed names the player looks for**  
+`entrance_00x` · `main_00x` · `action_00x` · `super_00x`  
+
+- Do **not** create duplicate stage keys.  
+- Actions and supers always belong to a `main_`.
+
+### Geometry Guide
+
+Format: `[xmin, ymin, xmax, ymax]`  
+Full screen = `[0, 0, 1920, 1080]`
+
+**Standard quadrants**
+
+```
+Upper Left   [0,    0,   960,  540]
+Upper Right  [960,  0,  1920,  540]
+Lower Left   [0,   540,  960, 1080]
+Lower Right  [960, 540, 1920, 1080]
+```
+
+Centered box: `[480, 270, 1440, 810]`
+
+**Quick visual**
+
+```
+0 ─────────────────────────────── 1920
+│ (0,0)                     (1920,0) │
+│                                    │
+│     (480,270)────────(1440,270)    │
+│         │                 │        │
+│         │   Centered      │        │
+│         │                 │        │
+│     (480,810)────────(1440,810)    │
+│                                    │
+│ (0,1080)                 (1920,1080)│
+1080 ───────────────────────────────
+```
+
+You can use any rectangle inside these bounds.
+
+### Reminders
+
+- Videos must match in resolution, codec, and container.
+- Stage keys must be unique and follow the exact naming pattern.
+- Geometry values must be within `0–1920` / `0–1080`.
+- Always validate your JSON (trailing commas will break it).
 
 ## FAQ
 
@@ -39,7 +177,7 @@ LDB Player is a Windows-specific media player that transforms your desktop into 
 - Drag and drop a video file directly onto the player — it will be automatically added to the playlist.
 
 **2. What file types are currently supported?**
-- `.mp4`, `.mkv`, `.avi`, `.mov`, `.wmv`, `.flv`, `.webm`, `.mpeg`, `.mpg`, `.m4v`
+- `.mp4`, `.mkv`, `.avi`, `.mov`, `.wmv`, `.flv`, `.webm`, `.mpeg`, `.mpg`, `.m4v`, `.json`
 
 **3. Why can't I see my desktop icons?**
 - The video window is placed above your desktop icons (and below other open applications). This is normal behavior.
@@ -77,6 +215,9 @@ LDB Player is a Windows-specific media player that transforms your desktop into 
 - Discord: https://discord.gg/TAfUNGHYR3
 
 ## Version Changes
+- v1.2.0
+    - Interactive live set system
+    - Minimal UI adjustments
 - v1.1.6
     - Added a small tweak for multi-instances
     - Latest stable release
@@ -120,14 +261,32 @@ LDB Player is a Windows-specific media player that transforms your desktop into 
     - Initial release
 
 ## Credits and Acknowledgments
-- Powered by VLC media player (libvlc) from VideoLAN: https://www.videolan.org/vlc/
-- Built with PyQt6 from Riverbank Computing: https://www.riverbankcomputing.com/software/pyqt/
-- Utilizes Windows APIs via pywin32 for system integration.
-- Other dependencies: Python standard libraries (sys, os, json, etc.), vlc.py bindings.
 
-A complete list of third-party licenses and notices is available in the application and in the repository [NOTICE](NOTICE) file.
+**Current version (v1.2.0+ – Microsoft Store)**
+- Powered by VLC media player (libVLC) from VideoLAN: https://www.videolan.org/vlc/
+- Built with PySide6 (Qt for Python) from The Qt Company: https://www.qt.io/qt-for-python
+- Utilizes Windows APIs via pywin32 for system integration.
+- Other dependencies: Python standard libraries, python-vlc, etc.
+
+**Legacy versions (v1.1.6 and earlier)**
+- Built with PyQt6 from Riverbank Computing.
+- Same VLC / pywin32 / python-vlc stack.
+
+A complete list of third-party licenses and notices is available in the application and in the repository [NOTICE](NOTICE) file (for the open-source line).
 
 ## License
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+### Current version (v1.2.0 and later)
+Copyright (c) 2025–2026 @kakao90g. All rights reserved.
+
+This version is proprietary software. It is distributed exclusively through the Microsoft Store and is governed by the Microsoft Standard Application License Terms together with any additional terms provided by the publisher.
+
+The source code for v1.2.0+ is not publicly available.
+
+### Legacy versions (v1.1.6 and earlier)
+These versions remain licensed under the MIT License.  
+See the [LICENSE](LICENSE) file for the full text.
+
+The last open-source release is v1.1.6. Future development continues only on the proprietary Microsoft Store line.
 
 Developed by @kakao90g.

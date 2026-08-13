@@ -1,10 +1,13 @@
 LDB Player - Third-Party Notices
 ================================
 
-This application is open source and licensed under the MIT License.
-Full license text: https://github.com/kakao90g/ldb_player/blob/main/LICENSE
+IMPORTANT LICENSE SPLIT
+- v1.2.0 and later (Microsoft Store) → Proprietary. See the application and Microsoft Store listing for current notices.
+- v1.1.6 and earlier → Open source under the MIT License (this NOTICE applies to those versions).
 
-The application uses the following third-party components:
+Full MIT license text for legacy versions: https://github.com/kakao90g/ldb_player/blob/main/LICENSE
+
+The application uses the following third-party components (legacy open-source line):
 
 1. VLC media player (libVLC)
    Copyright (C) VideoLAN and VLC authors
@@ -13,7 +16,7 @@ The application uses the following third-party components:
    Website: https://www.videolan.org/vlc/
    Source:  https://code.videolan.org/videolan/vlc
 
-2. PyQt6
+2. PyQt6 (used only in v1.1.6 and earlier)
    Copyright (C) Riverbank Computing Limited
    License: GNU General Public License v3 (or later) or commercial license
    Website: https://www.riverbankcomputing.com/software/pyqt/
