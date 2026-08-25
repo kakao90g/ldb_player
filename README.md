@@ -1,9 +1,10 @@
 # LDB Player (Live Desktop Background Player)
 
-LDB Player is a lightweight and powerful live wallpaper player for Windows. It features a new live set system (interactive live wallpapers) which opens endless possibilities for desktop customization.
+LDB Player is a lightweight and powerful live wallpaper player for Windows. Experience the feature-rich live set system (interactive live wallpapers) which opens endless possibilities for desktop customization.
 
 ![LDB Player Main UI](screenshots/main-ui.png)
 ![LDB Player Multi Instance](screenshots/multi-instance.png)
+![LDB Player Live Set Compiler](screenshots/compiler.png)
 
 ## Important: Version & License Split (as of v1.2.0)
 
@@ -22,8 +23,8 @@ LDB Player is a lightweight and powerful live wallpaper player for Windows. It f
 - Please check the **FAQ** section below.
 
 ## Features
-- Play videos as live wallpapers.
-- Play and create new proprietary live sets (interactive live wallpapers).
+- Play your favorite videos as live wallpapers.
+- Play and create engaging live sets with the built-in companion tool.
 - Multi-display & multi-instance support — of up to 32 simultaneous instances.
 - Smart auto-play feature on system startup adjustable in Settings.
 - Playlist management: Add, remove, shuffle, save, and load playlists.
@@ -59,7 +60,7 @@ Geometries are written for **1080p (1920×1080)** and automatically scale to the
 
 ```json
 {
-  "name": "New live set name",
+  "name": "live set 01",
   "save_point": false,
   "saved_stage": null,
   "random": 0,
@@ -79,7 +80,6 @@ Geometries are written for **1080p (1920×1080)** and automatically scale to the
         { "id": "super_002", "geometry": [960, 0, 1920, 540], "video": "super02.mp4", "next": "entrance_002" }
       ]
     },
-
     "entrance_002": { "video": "entrance02.mp4", "next": "main_002" },
     "main_002": {
       "video": "main02.mp4",
@@ -93,7 +93,6 @@ Geometries are written for **1080p (1920×1080)** and automatically scale to the
         { "id": "super_002", "geometry": [960, 540, 1920, 1080], "video": "super02.mp4", "next": "entrance_003" }
       ]
     },
-
     "entrance_003": { "video": "entrance03.mp4", "next": "main_003" },
     "main_003": {
       "video": "main03.mp4",
@@ -128,6 +127,15 @@ Geometries are written for **1080p (1920×1080)** and automatically scale to the
 
 - Do **not** create duplicate stage keys.  
 - Actions and supers always belong to a `main_`.
+
+### Stage Key Properties
+
+| Stage key | Description | Accepts clicks | Loop | `next` behavior |
+|-----------|-------------|----------------|------|-----------------|
+| `entrance_00x` | Optional video played before a main | No | — | `null` = search for the next valid `entrance_00x` / `main_00x` by number order. Can also jump to any `entrance_00x` or `main_00x`. |
+| `main_00x` | Video that loops itself and accepts clicks for actions and supers | Yes | Yes | — |
+| `action_00x` | Tied to a main. When the super meter reaches 100, action regions are replaced by super regions | Yes | — | `null` = return to its owning main. Can also jump to any `entrance_00x` or `main_00x`. |
+| `super_00x` | Tied to a main | No | — | `null` = return to its owning main. Can also jump to any `entrance_00x` or `main_00x`. |
 
 ### Geometry Guide
 
@@ -172,34 +180,34 @@ You can use any rectangle inside these bounds.
 
 ## FAQ
 
-**1. How do I add files to play?**
+**How do I add files to play?**
 - Open the playlist by pressing **Q** on the keyboard, or click the playlist icon on the main player, then select **Add files**.
 - Drag and drop a video file directly onto the player — it will be automatically added to the playlist.
 
-**2. What file types are currently supported?**
+**What file types are currently supported?**
 - `.mp4`, `.mkv`, `.avi`, `.mov`, `.wmv`, `.flv`, `.webm`, `.mpeg`, `.mpg`, `.m4v`, `.json`
 
-**3. Why can't I see my desktop icons?**
-- The video window is placed above your desktop icons (and below other open applications). This is normal behavior.
+**Why can't I see my desktop icons?**
+- The video window is placed above your desktop icons (and below other open applications). To close the video window using hotkeys, click on it and press **S** on the keyboard.
 
-**4. When playing vertical "Shorts" videos, I see my desktop wallpaper on the left and right sides. Is this normal?**
+**When playing vertical "Shorts" videos, I see my desktop wallpaper on the left and right sides. Is this normal?**
 - Yes. The current version does not change your wallpaper settings. For a cleaner look, you can temporarily set your desktop background to a solid color.
 
-**5. The Windows taskbar blocks the bottom of the video. How do I fix this?**
+**The Windows taskbar blocks the bottom of the video. How do I fix this?**
 - Right-click the taskbar → **Taskbar settings** → Enable **Automatically hide the taskbar**.
 
-**6. How do I create or run a new instance?**
+**How do I create or run a new instance?**
 - Go to **Settings** → **Create a new LDB Player instance...** → **Confirm the creation**.
 
-**7. What does a new instance do?**
+**What does a new instance do?**
 - It allows you to run LDB Player on multiple displays.
 - Each new instance has its own save configuration file for independent customization.
 
-**8. How do I check which instances are currently open or running?**
+**How do I check which instances are currently open or running?**
 - Go to **Settings** → **Instance Manager**.  
   A list of all created instances will be shown. Deleting an instance here will also clean up its save configuration files.
 
-**9. How do I support the project or developer?**
+**How do I support the project or developer?**
 - Share LDB Player with your friends.
 - ⭐ Star the repository on GitHub: https://github.com/kakao90g/ldb_player
 - Send a tip through the in-app sponsor links or via the links below.
@@ -215,6 +223,9 @@ You can use any rectangle inside these bounds.
 - Discord: https://discord.gg/TAfUNGHYR3
 
 ## Version Changes
+- v1.2.3
+    - Added live set compiler
+    - Minimal UI adjustments
 - v1.2.0
     - Interactive live set system
     - Minimal UI adjustments
