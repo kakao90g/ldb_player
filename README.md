@@ -177,6 +177,7 @@ You can use any rectangle inside these bounds.
 - Stage keys must be unique and follow the exact naming pattern.
 - Geometry values must be within `0–1920` / `0–1080`.
 - Always validate your JSON (trailing commas will break it).
+- Add the JSON to the main player to play it.
 
 ## FAQ
 
